@@ -6,6 +6,7 @@ import { AppService } from './app.service.js';
 import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CasesModule } from './cases/cases.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { CasesModule } from './cases/cases.module.js';
     UsersModule,
     AuthModule,
     CasesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

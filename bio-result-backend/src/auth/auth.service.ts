@@ -36,6 +36,8 @@ export class AuthService {
       username: user.username,
       role: user.role,
       fullName: user.fullName,
+      donVi: user.donVi || '',
+      allowedCategories: user.allowedCategories || [],
     };
 
     return {
@@ -45,6 +47,8 @@ export class AuthService {
         username: user.username,
         fullName: user.fullName,
         role: user.role,
+        donVi: user.donVi || '',
+        allowedCategories: user.allowedCategories || [],
       },
     };
   }
