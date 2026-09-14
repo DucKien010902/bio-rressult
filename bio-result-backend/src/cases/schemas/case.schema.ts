@@ -23,7 +23,7 @@ export class LabMetric {
   @Prop({ default: '' })
   referenceRange!: string;
 
-  @Prop({ default: 'normal', enum: ['normal', 'warning', 'danger'] })
+  @Prop({ type: String, default: 'normal', enum: ['normal', 'warning', 'danger'] })
   alert!: 'normal' | 'warning' | 'danger';
 }
 
@@ -176,6 +176,7 @@ export class BioCase extends Document {
 
   // --- Trạng thái vòng đời phiếu ---
   @Prop({
+    type: String,
     required: true,
     enum: [
       'nhap_thong_tin',

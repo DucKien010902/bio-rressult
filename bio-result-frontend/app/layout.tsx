@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
+import AuthFetchInterceptor from '@/components/common/AuthFetchInterceptor';
 
 const plusJakarta = Plus_Jakarta_Sans({
   weight: ['400', '500', '600', '700', '800'],
@@ -33,6 +34,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/logo_gentech.png" />
       </head>
       <body className="min-h-full flex flex-col font-sans bg-[#f1f5f9] text-slate-800">
+        <AuthFetchInterceptor />
         {children}
       </body>
     </html>

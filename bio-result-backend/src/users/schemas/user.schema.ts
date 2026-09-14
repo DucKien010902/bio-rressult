@@ -15,6 +15,7 @@ export class User extends Document {
   fullName!: string;
 
   @Prop({
+    type: String,
     required: true,
     enum: ['admin', 'doctor', 'bacsy', 'lab'],
     default: 'doctor',
