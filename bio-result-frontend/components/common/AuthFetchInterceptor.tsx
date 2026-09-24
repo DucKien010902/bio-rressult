@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { API_BASE_URL } from '@/lib/config';
 
 export default function AuthFetchInterceptor() {
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function AuthFetchInterceptor() {
       }
 
       // Tự động gắn Authorization token & thông tin user cho mọi request gọi tới backend
-      if (url.includes(':5002/api')) {
+      if (url.includes(API_BASE_URL) || url.includes('/api/')) {
         const token = localStorage.getItem('bio_token');
         const userStr = localStorage.getItem('bio_user');
 

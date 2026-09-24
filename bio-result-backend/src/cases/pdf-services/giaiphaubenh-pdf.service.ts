@@ -1,0 +1,94 @@
+import { Injectable } from '@nestjs/common';
+import { PDFDocument, PDFFont, rgb } from 'pdf-lib';
+import { BasePdfService } from './base-pdf.service.js';
+
+@Injectable()
+export class GiaiphaubenhPdfService extends BasePdfService {
+  /**
+   * Xử lý vẽ kết quả Giải phẫu bệnh
+   */
+  generatePdf(
+    pdfDoc: PDFDocument,
+    caseItem: any,
+    fontR: PDFFont,
+    fontB: PDFFont,
+  ) {
+    const pg = pdfDoc.getPages()[0];
+    this.mw(pg, 150, 703, caseItem.maSo || '', fontR, fontB, {
+      bold: true,
+      size: 9.5,
+      w: 140,
+    });
+    this.mw(
+      pg,
+      400,
+      703,
+      (caseItem.hoTen || '').toUpperCase(),
+      fontR,
+      fontB,
+      { bold: true, size: 9.5, w: 170 },
+    );
+    this.mw(pg, 150, 685, String(caseItem.namSinh || ''), fontR, fontB, {
+      size: 9,
+      w: 140,
+    });
+    this.mw(pg, 400, 685, caseItem.gioiTinh || 'Nữ', fontR, fontB, {
+      size: 9,
+      w: 90,
+    });
+    this.mw(pg, 150, 667, caseItem.diaChi || '', fontR, fontB, {
+      size: 8.5,
+      w: 415,
+    });
+    this.mw(pg, 150, 649, caseItem.soDienThoai || '', fontR, fontB, {
+      size: 9,
+      w: 140,
+    });
+    this.mw(pg, 150, 631, caseItem.donVi || '', fontR, fontB, {
+      size: 9,
+      w: 415,
+    });
+    this.mw(pg, 150, 613, caseItem.loaiMau || 'Sinh thiết', fontR, fontB, {
+      size: 9,
+      w: 415,
+    });
+    this.mw(pg, 150, 595, caseItem.viTriBenhPham || '', fontR, fontB, {
+      size: 9,
+      w: 415,
+    });
+    this.mw(
+      pg,
+      140,
+      577,
+      this.fmtDate(caseItem.ngayNhanMau || caseItem.createdAt),
+      fontR,
+      fontB,
+      { size: 9, w: 150 },
+    );
+    const tKq = this.fmtDate(
+      caseItem.ngayTraKetQua || caseItem.ngayDuKienTra,
+    );
+    this.mw(pg, 400, 577, tKq, fontR, fontB, { size: 9, w: 170 });
+
+    this.mw(
+      pg,
+      120,
+      397,
+      (caseItem.ketLuan || '').toUpperCase(),
+      fontR,
+      fontB,
+      { bold: true, size: 8.5, w: 460, color: rgb(0, 0.2, 0.6) },
+    );
+    this.drawDateAndDoctor(
+      pg,
+      tKq,
+      caseItem.bacSiDoc,
+      fontR,
+      fontB,
+      351,
+      333,
+      347,
+      211,
+    );
+  }
+}

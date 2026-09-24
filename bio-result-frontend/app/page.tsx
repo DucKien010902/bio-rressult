@@ -8,13 +8,16 @@ import CaseTable, { CaseItem } from '@/components/cases/CaseTable';
 import CaseCreateModal from '@/components/cases/CaseCreateModal';
 import DashboardView from '@/components/dashboard/DashboardView';
 import { Plus, FileSpreadsheet } from 'lucide-react';
+import { getApiUrl, getAuthHeaders } from '@/lib/config';
+
+import LogoutConfirmModal from '@/components/layout/LogoutConfirmModal';
 
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Category state from query or default
-  const categoryParam = searchParams?.get('category') || 'hpv40';
+  // Category state from query or default to dashboard
+  const categoryParam = searchParams?.get('category') || 'dashboard';
   const [activeCategory, setActiveCategory] = useState(categoryParam);
 
   // User session
@@ -23,6 +26,7 @@ function DashboardContent() {
   // Layout states
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Data states
   const [cases, setCases] = useState<CaseItem[]>([]);
@@ -60,7 +64,10 @@ function DashboardContent() {
     setLoading(true);
     try {
       const res = await fetch(
-        `http://localhost:5002/api/cases?category=${activeCategory}`
+        getApiUrl(`/cases?category=${activeCategory}`),
+        {
+          headers: getAuthHeaders(),
+        }
       );
       if (res.ok) {
         const data = await res.json();
@@ -97,7 +104,7 @@ function DashboardContent() {
           router.push(`/?category=${catId}`);
         }}
         currentUser={currentUser}
-        onLogout={handleLogout}
+        onLogout={() => setShowLogoutModal(true)}
       />
 
       {/* 2. MAIN VIEW AREA */}
@@ -107,11 +114,7 @@ function DashboardContent() {
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
           currentUser={currentUser}
-          onLogout={handleLogout}
-          onUserSwitch={(newUser) => {
-            setCurrentUser(newUser);
-            fetchCases();
-          }}
+          onLogout={() => setShowLogoutModal(true)}
         />
 
         {/* Main Content Body */}
@@ -161,7 +164,7 @@ function DashboardContent() {
                   <button
                     onClick={() => {
                       window.open(
-                        `http://localhost:5002/api/cases/stats/export-excel?type=all`,
+                        getApiUrl(`/cases/stats/export-excel?type=all`),
                         '_blank'
                       );
                     }}
@@ -212,6 +215,13 @@ function DashboardContent() {
         activeCategory={activeCategory}
         categoryLabel={activeCategoryObj.label}
         currentUser={currentUser}
+      />
+
+      {/* 4. MODAL XÁC NHẬN ĐĂNG XUẤT */}
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
       />
     </div>
   );

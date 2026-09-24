@@ -43,6 +43,8 @@ export interface CaseItem {
   createdAt: string;
 }
 
+import { getApiUrl, getAuthHeaders } from '@/lib/config';
+
 interface CaseTableProps {
   cases: CaseItem[];
   loading: boolean;
@@ -181,8 +183,9 @@ export default function CaseTable({
   const handleDelete = async (id: string, maSo: string) => {
     if (confirm(`Bạn có chắc chắn muốn xóa phiếu ${maSo}?`)) {
       try {
-        const res = await fetch(`http://localhost:5002/api/cases/${id}`, {
+        const res = await fetch(getApiUrl(`/cases/${id}`), {
           method: 'DELETE',
+          headers: getAuthHeaders(),
         });
         if (res.ok) {
           onRefresh();
@@ -202,7 +205,7 @@ export default function CaseTable({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setActiveStatusTab('all')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
                 activeStatusTab === 'all'
                   ? 'bg-[#0070f3] text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -210,7 +213,7 @@ export default function CaseTable({
             >
               <span>Tất cả</span>
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${
                   activeStatusTab === 'all'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200 text-slate-600'
@@ -222,7 +225,7 @@ export default function CaseTable({
 
             <button
               onClick={() => setActiveStatusTab('nhap_thong_tin')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
                 activeStatusTab === 'nhap_thong_tin'
                   ? 'bg-amber-500 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -230,7 +233,7 @@ export default function CaseTable({
             >
               <span>Nhập thông tin</span>
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${
                   activeStatusTab === 'nhap_thong_tin'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200 text-slate-600'
@@ -242,7 +245,7 @@ export default function CaseTable({
 
             <button
               onClick={() => setActiveStatusTab('chay_ket_qua')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
                 activeStatusTab === 'chay_ket_qua'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -250,7 +253,7 @@ export default function CaseTable({
             >
               <span>Chạy kết quả</span>
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${
                   activeStatusTab === 'chay_ket_qua'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200 text-slate-600'
@@ -262,7 +265,7 @@ export default function CaseTable({
 
             <button
               onClick={() => setActiveStatusTab('da_tra_ket_qua')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
                 activeStatusTab === 'da_tra_ket_qua'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -270,7 +273,7 @@ export default function CaseTable({
             >
               <span>Đã trả kết quả</span>
               <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${
+                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${
                   activeStatusTab === 'da_tra_ket_qua'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200 text-slate-600'
@@ -282,54 +285,54 @@ export default function CaseTable({
           </div>
 
           {/* Search Box */}
-          <div className="relative w-full lg:w-72">
+          <div className="relative w-full lg:w-80">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
               placeholder="Tìm theo Tên, Mã số, SĐT..."
-              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#0070f3] transition-all font-medium"
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#0070f3] transition-all font-medium"
             />
           </div>
         </div>
 
         {/* Row 2: Date filter & Source filter */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100 text-xs text-slate-600">
-          <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-4 pt-3.5 border-t border-slate-100 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="flex items-center gap-1 font-semibold text-slate-700">
-              <Calendar className="w-3.5 h-3.5 text-blue-600" />
+              <Calendar className="w-4 h-4 text-blue-600" />
               Lọc theo ngày tạo:
             </span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-slate-400">Từ ngày:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-medium">Từ ngày:</span>
               <input
                 type="date"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 text-xs focus:bg-white focus:outline-none focus:border-blue-500"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 text-sm focus:bg-white focus:outline-none focus:border-blue-500 font-medium"
               />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-slate-400">Đến ngày:</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-medium">Đến ngày:</span>
               <input
                 type="date"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
-                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 text-xs focus:bg-white focus:outline-none focus:border-blue-500"
+                className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 text-sm focus:bg-white focus:outline-none focus:border-blue-500 font-medium"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <span className="flex items-center gap-1 font-semibold text-slate-700">
-              <UserIcon className="w-3.5 h-3.5 text-purple-600" />
+              <UserIcon className="w-4 h-4 text-purple-600" />
               Lọc theo nguồn:
             </span>
             <select
               value={selectedSource}
               onChange={(e) => setSelectedSource(e.target.value)}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 text-xs font-medium focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 text-sm font-medium focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
             >
               <option value="all">-- Tất cả nguồn tạo --</option>
               {sources.map((src) => (
@@ -345,9 +348,9 @@ export default function CaseTable({
       {/* 2. DATA TABLE CARD */}
       <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-sm">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-xs">
                 <th className="py-3.5 px-4 font-bold">MÃ SỐ</th>
                 <th className="py-3.5 px-4 font-bold">HỌ VÀ TÊN</th>
                 <th className="py-3.5 px-3 font-bold text-center">NĂM SINH</th>
@@ -509,7 +512,7 @@ export default function CaseTable({
                               onClick={() => {
                                 setOpenActionId(null);
                                 window.open(
-                                  `http://localhost:5002/api/cases/${item._id}/export-pdf`,
+                                  getApiUrl(`/cases/${item._id}/export-pdf`),
                                   '_blank'
                                 );
                               }}
@@ -559,7 +562,7 @@ export default function CaseTable({
         </div>
 
         {/* Pagination Footer */}
-        <div className="p-4 bg-slate-50/70 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 font-medium">
+        <div className="p-4 bg-slate-50/70 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-600 font-medium">
           {/* Info & Page Size */}
           <div className="flex flex-wrap items-center gap-4">
             <span>
@@ -576,15 +579,15 @@ export default function CaseTable({
               )}
             </span>
 
-            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
-              <span className="text-slate-500">Mỗi trang:</span>
+            <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
+              <span className="text-slate-500 font-medium">Mỗi trang:</span>
               <select
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                className="text-xs font-semibold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0070f3]/20 focus:border-[#0070f3] cursor-pointer shadow-2xs"
+                className="text-sm font-semibold bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#0070f3]/20 focus:border-[#0070f3] cursor-pointer shadow-2xs"
               >
                 <option value={10}>10</option>
                 <option value={20}>20</option>
@@ -596,20 +599,20 @@ export default function CaseTable({
 
           {/* Navigation Buttons */}
           {totalPages > 1 && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
                 disabled={currentPage <= 1}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title="Trang trước"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-4.5 h-4.5" />
               </button>
 
               {pageNumbers.map((p, idx) => {
                 if (p === '...') {
                   return (
-                    <span key={`dots-${idx}`} className="px-2 py-1 text-slate-400 font-medium select-none">
+                    <span key={`dots-${idx}`} className="px-2 py-1 text-slate-400 font-medium select-none text-sm">
                       ...
                     </span>
                   );
@@ -619,7 +622,7 @@ export default function CaseTable({
                   <button
                     key={`page-${p}`}
                     onClick={() => setCurrentPage(p as number)}
-                    className={`min-w-8 h-8 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    className={`min-w-9 h-9 px-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${
                       isCurrent
                         ? 'bg-[#0070f3] text-white shadow-xs'
                         : 'bg-white border border-slate-200/80 text-slate-700 hover:bg-slate-100'
@@ -633,10 +636,10 @@ export default function CaseTable({
               <button
                 onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                 disabled={currentPage >= totalPages}
-                className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 title="Trang tiếp theo"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-4.5 h-4.5" />
               </button>
             </div>
           )}

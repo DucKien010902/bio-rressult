@@ -51,6 +51,8 @@ interface StatsData {
   } | null;
 }
 
+import { getApiUrl, getAuthHeaders } from '@/lib/config';
+
 interface DashboardViewProps {
   currentUser?: any;
   onSelectCategory?: (catId: string, filterDoctor?: string) => void;
@@ -70,7 +72,7 @@ export default function DashboardView({
   const fetchStats = async () => {
     setLoading(true);
     try {
-      let url = 'http://localhost:5002/api/cases/stats';
+      let url = getApiUrl('/cases/stats');
       const params = new URLSearchParams();
 
       if (isDoctor && doctorName) {
@@ -84,7 +86,9 @@ export default function DashboardView({
         url += `?${queryString}`;
       }
 
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -101,7 +105,7 @@ export default function DashboardView({
   }, [currentUser]);
 
   const handleExportExcel = (type: 'all' | 'doctor') => {
-    let url = `http://localhost:5002/api/cases/stats/export-excel?type=${type}`;
+    let url = getApiUrl(`/cases/stats/export-excel?type=${type}`);
     if (isDoctor && doctorName) {
       url += `&doctor=${encodeURIComponent(doctorName)}`;
     }

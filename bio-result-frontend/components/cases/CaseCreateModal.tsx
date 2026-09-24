@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { X, Plus } from 'lucide-react';
 
+import { getApiUrl, getAuthHeaders } from '@/lib/config';
+
 interface CaseCreateModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -51,9 +53,9 @@ export default function CaseCreateModal({
         ngayNhanMau: new Date().toISOString().split('T')[0],
       };
 
-      const res = await fetch('http://localhost:5002/api/cases', {
+      const res = await fetch(getApiUrl('/cases'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 

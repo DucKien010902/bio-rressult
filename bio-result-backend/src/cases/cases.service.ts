@@ -16,47 +16,63 @@ export class CasesService {
     doctor?: string,
     donVi?: string,
   ): Promise<BioCase[]> {
-    const query: any = {};
+    const conditions: any[] = [];
 
     // Lọc theo trạng thái
     if (status && status !== 'all') {
-      query.$or = [{ status }, { trangThai: status }];
+      conditions.push({
+        $or: [{ status }, { trangThai: status }],
+      });
     }
 
-    // Lọc theo danh mục dịch vụ (cell, thinprep, hpv40, combo...)
+    // Lọc theo danh mục dịch vụ chuẩn xác (cell, thinprep, hpv40, combo_hpv20_cell...)
     if (category && category !== 'all') {
-      query.$or = [
-        { loaiXetNghiem: category },
-        { testType: new RegExp(category, 'i') },
-      ];
+      conditions.push({
+        $or: [
+          { loaiXetNghiem: category },
+          { testType: category },
+        ],
+      });
     }
 
-    // Lọc theo bác sĩ đọc kết quả
+    // Lọc theo bác sĩ đọc kết quả (hỗ trợ cả bác sĩ 1 và 2, chuẩn hóa học hàm và khoảng trắng)
     if (doctor && doctor.trim() !== '') {
-      query.$or = [
-        { bacSiDoc: new RegExp(doctor.trim(), 'i') },
-        { doctorName: new RegExp(doctor.trim(), 'i') },
-      ];
+      const rawName = doctor.trim();
+      const escapedRaw = rawName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+      const coreName = rawName.replace(/^(TS|BS|ThS|BSCK1|BS\s*CK1|BSNT|ThS\.\s*BSNT|\.|\s)+/gi, '').trim();
+      const escapedCore = coreName.length >= 3 ? coreName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*') : escapedRaw;
+      const docRegex = new RegExp(`(${escapedRaw}|${escapedCore})`, 'i');
+
+      conditions.push({
+        $or: [
+          { bacSiDoc: docRegex },
+          { bacSiDoc2: docRegex },
+          { doctorName: docRegex },
+        ],
+      });
     }
 
     // Lọc theo đơn vị gửi mẫu
     if (donVi && donVi.trim() !== '') {
-      query.donVi = new RegExp(donVi.trim(), 'i');
+      conditions.push({ donVi: new RegExp(donVi.trim(), 'i') });
     }
 
     // Tìm kiếm từ khóa (Mã số, tên bệnh nhân, điện thoại...)
     if (keyword && keyword.trim() !== '') {
       const regex = new RegExp(keyword.trim(), 'i');
-      query.$or = [
-        { hoTen: regex },
-        { patientName: regex },
-        { maSo: regex },
-        { patientCode: regex },
-        { soDienThoai: regex },
-        { donVi: regex },
-      ];
+      conditions.push({
+        $or: [
+          { hoTen: regex },
+          { patientName: regex },
+          { maSo: regex },
+          { patientCode: regex },
+          { soDienThoai: regex },
+          { donVi: regex },
+        ],
+      });
     }
 
+    const query = conditions.length > 0 ? { $and: conditions } : {};
     return this.caseModel.find(query).sort({ createdAt: -1 }).exec();
   }
 

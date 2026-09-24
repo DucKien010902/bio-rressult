@@ -6,8 +6,12 @@ import Sidebar, { MENU_CATEGORIES } from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import PatientInfoCard from '@/components/cases/PatientInfoCard';
 import HpvResultCard from '@/components/cases/HpvResultCard';
+import CellResultCard from '@/components/cases/CellResultCard';
+import SoituoiResultCard from '@/components/cases/SoituoiResultCard';
+import GiaiphaubenhResultCard from '@/components/cases/GiaiphaubenhResultCard';
 import ResultStickyBar from '@/components/cases/ResultStickyBar';
 import PdfPreviewSection from '@/components/cases/PdfPreviewSection';
+import { getApiUrl, getAuthHeaders } from '@/lib/config';
 import {
   Eye,
   Save,
@@ -17,7 +21,10 @@ import {
   Clock,
   FlaskConical,
   ArrowLeft,
+  ShieldAlert,
 } from 'lucide-react';
+
+import LogoutConfirmModal from '@/components/layout/LogoutConfirmModal';
 
 export default function CaseDetailPage() {
   const params = useParams();
@@ -27,6 +34,7 @@ export default function CaseDetailPage() {
   // Session & Layout states
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Case Data states
   const [caseData, setCaseData] = useState<any>(null);
@@ -59,12 +67,15 @@ export default function CaseDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5002/api/cases/${id}`);
+      const res = await fetch(getApiUrl(`/cases/${id}`), {
+        headers: getAuthHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         setCaseData(data);
       } else {
-        alert('Không tìm thấy ca xét nghiệm!');
+        const errJson = await res.json().catch(() => ({}));
+        alert(errJson.message || 'Không tìm thấy ca xét nghiệm hoặc không có quyền truy cập!');
         router.push('/');
       }
     } catch (err) {
@@ -95,11 +106,15 @@ export default function CaseDetailPage() {
   // Save all changes
   const handleSaveChanges = async () => {
     if (!caseData || !id) return;
+    if (currentUser?.role === 'lab') {
+      alert('Tài khoản đơn vị gửi mẫu không có quyền chỉnh sửa thông tin!');
+      return;
+    }
     setIsSaving(true);
     try {
-      const res = await fetch(`http://localhost:5002/api/cases/${id}`, {
+      const res = await fetch(getApiUrl(`/cases/${id}`), {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(caseData),
       });
       if (res.ok) {
@@ -107,7 +122,8 @@ export default function CaseDetailPage() {
         setCaseData(updated);
         alert('Đã lưu thông tin phiếu xét nghiệm thành công!');
       } else {
-        alert('Có lỗi khi lưu thông tin phiếu!');
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.message || 'Có lỗi khi lưu thông tin phiếu!');
       }
     } catch (err) {
       console.error('Error saving case:', err);
@@ -120,12 +136,16 @@ export default function CaseDetailPage() {
   // Toggle Doctor Signature
   const handleToggleSign = async () => {
     if (!caseData || !id) return;
+    if (currentUser?.role === 'lab') {
+      alert('Tài khoản đơn vị gửi mẫu không có quyền ký duyệt kết quả!');
+      return;
+    }
     const newDaKy = !caseData.daKy;
     setIsSaving(true);
     try {
-      const res = await fetch(`http://localhost:5002/api/cases/${id}`, {
+      const res = await fetch(getApiUrl(`/cases/${id}`), {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           ...caseData,
           daKy: newDaKy,
@@ -151,7 +171,8 @@ export default function CaseDetailPage() {
   // Download PDF helper
   const handleDownloadPdf = () => {
     if (!id) return;
-    window.open(`http://localhost:5002/api/cases/${id}/export-pdf`, '_blank');
+    const token = localStorage.getItem('bio_token') || '';
+    window.open(getApiUrl(`/cases/${id}/export-pdf?token=${encodeURIComponent(token)}`), '_blank');
   };
 
   const currentCategory =
@@ -168,7 +189,7 @@ export default function CaseDetailPage() {
           router.push(`/?category=${catId}`);
         }}
         currentUser={currentUser}
-        onLogout={handleLogout}
+        onLogout={() => setShowLogoutModal(true)}
       />
 
       {/* 2. MAIN VIEW AREA (RIGHT OF SIDEBAR) */}
@@ -178,7 +199,7 @@ export default function CaseDetailPage() {
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
           currentUser={currentUser}
-          onLogout={handleLogout}
+          onLogout={() => setShowLogoutModal(true)}
         />
 
         {/* Page Content Body */}
@@ -247,22 +268,13 @@ export default function CaseDetailPage() {
                   </p>
                 </div>
 
-                {/* Top Actions: [Xem trước PDF] [Lưu thay đổi] [Download PDF kết quả] */}
+                {/* Top Actions: [Lưu thay đổi] [Download PDF kết quả] */}
                 <div className="flex items-center gap-3 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => setShowPdfPreview(!showPdfPreview)}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
-                  >
-                    <Eye className="w-4 h-4 text-[#0070f3]" />
-                    <span>Xem trước PDF</span>
-                  </button>
-
                   <button
                     type="button"
                     onClick={handleSaveChanges}
                     disabled={isSaving}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-[#0070f3] hover:bg-[#005bb5] text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-[#0070f3] hover:bg-[#005bb5] text-white rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
                   >
                     {isSaving ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -275,7 +287,7 @@ export default function CaseDetailPage() {
                   <button
                     type="button"
                     onClick={handleDownloadPdf}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs"
                   >
                     <Download className="w-4 h-4 text-emerald-600" />
                     <span>Download PDF kết quả</span>
@@ -283,7 +295,7 @@ export default function CaseDetailPage() {
                 </div>
               </div>
 
-              {/* Card 1: Thông tin hành chính bệnh nhân (Ảnh 1) */}
+              {/* Card 1: Thông tin hành chính bệnh nhân */}
               <PatientInfoCard
                 caseData={caseData}
                 onChange={handleFieldChange}
@@ -291,34 +303,83 @@ export default function CaseDetailPage() {
                 isSaving={isSaving}
               />
 
-              {/* Card 2: Kết quả xét nghiệm HPV 40 / 20 / 23 (Ảnh 2 & 3) */}
-              <HpvResultCard
-                caseData={caseData}
-                onChange={handleFieldChange}
-                onSave={handleSaveChanges}
-                onToggleSign={handleToggleSign}
-                isSaving={isSaving}
-              />
-
-              {/* Section 3: Inline PDF Preview (Ảnh 4 - hiển thị khi bấm Xem trước PDF) */}
-              {showPdfPreview && (
-                <PdfPreviewSection
-                  caseId={id}
-                  onClose={() => setShowPdfPreview(false)}
-                  onDownload={handleDownloadPdf}
+              {/* Card 2: Kết quả xét nghiệm theo dịch vụ */}
+              {caseData?.loaiXetNghiem?.startsWith('combo_') ? (
+                <>
+                  <HpvResultCard
+                    caseData={caseData}
+                    onChange={handleFieldChange}
+                    onSave={handleSaveChanges}
+                    onToggleSign={handleToggleSign}
+                    isSaving={isSaving}
+                    isCombo={true}
+                  />
+                  <CellResultCard
+                    caseData={caseData}
+                    onChange={handleFieldChange}
+                    onSave={handleSaveChanges}
+                    onToggleSign={handleToggleSign}
+                    isSaving={isSaving}
+                    isCombo={true}
+                  />
+                </>
+              ) : ['cell', 'thinprep'].includes(caseData?.loaiXetNghiem) ? (
+                <CellResultCard
+                  caseData={caseData}
+                  onChange={handleFieldChange}
+                  onSave={handleSaveChanges}
+                  onToggleSign={handleToggleSign}
+                  isSaving={isSaving}
+                />
+              ) : caseData?.loaiXetNghiem === 'soituoi' ? (
+                <SoituoiResultCard
+                  caseData={caseData}
+                  onChange={handleFieldChange}
+                  onSave={handleSaveChanges}
+                  onToggleSign={handleToggleSign}
+                  isSaving={isSaving}
+                />
+              ) : caseData?.loaiXetNghiem === 'giaiphaubenh' ? (
+                <GiaiphaubenhResultCard
+                  caseData={caseData}
+                  onChange={handleFieldChange}
+                  onSave={handleSaveChanges}
+                  onToggleSign={handleToggleSign}
+                  isSaving={isSaving}
+                />
+              ) : (
+                <HpvResultCard
+                  caseData={caseData}
+                  onChange={handleFieldChange}
+                  onSave={handleSaveChanges}
+                  onToggleSign={handleToggleSign}
+                  isSaving={isSaving}
                 />
               )}
 
-              {/* Floating Sticky Bottom Bar (Ảnh 1, 2, 3) */}
+              {/* Section 3: Inline PDF Preview - Luôn hiển thị cố định ở cuối trang */}
+              <PdfPreviewSection
+                caseId={id}
+                patientName={caseData?.hoTen}
+                onDownload={handleDownloadPdf}
+              />
+
+              {/* Floating Sticky Bottom Bar */}
               <ResultStickyBar
                 caseData={caseData}
-                onPreviewPdf={() => setShowPdfPreview(true)}
                 onDownloadPdf={handleDownloadPdf}
               />
             </>
           )}
         </main>
       </div>
+
+      {/* MODAL XÁC NHẬN ĐĂNG XUẤT */}
+      <LogoutConfirmModal
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
+      />
     </div>
   );
 }
