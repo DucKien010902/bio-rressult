@@ -8,6 +8,7 @@ interface PatientInfoCardProps {
   onChange: (field: string, value: any) => void;
   onSave: () => void;
   isSaving?: boolean;
+  currentUser?: any;
 }
 
 export default function PatientInfoCard({
@@ -15,7 +16,9 @@ export default function PatientInfoCard({
   onChange,
   onSave,
   isSaving = false,
+  currentUser,
 }: PatientInfoCardProps) {
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-5">
       {/* Card Header */}
@@ -153,17 +156,29 @@ export default function PatientInfoCard({
 
       {/* Row 4: Bác sĩ đọc kết quả (Gán phiếu) */}
       <div className="text-xs">
-        <label className="block text-[11px] font-bold text-sky-700 mb-1">
-          Bác sĩ đọc kết quả (Gán phiếu) *
+        <label className="block text-[11px] font-bold text-sky-700 mb-1 flex items-center justify-between">
+          <span>Bác sĩ đọc kết quả (Gán phiếu) *</span>
+          {!isAdmin && (
+            <span className="text-[10px] text-amber-600 font-semibold">
+              (Chỉ Admin mới có quyền phân công / thay đổi)
+            </span>
+          )}
         </label>
         <select
-          value={caseData?.bacSiDoc || 'TS . BS Nguyễn Khánh Dương'}
+          disabled={!isAdmin}
+          value={caseData?.bacSiDoc || 'TS.BS Nguyễn Sỹ Lãnh'}
           onChange={(e) => onChange('bacSiDoc', e.target.value)}
-          className="w-full sm:w-1/2 px-3.5 py-2.5 rounded-xl border border-sky-300 bg-sky-50/50 text-slate-900 font-bold focus:bg-white focus:outline-none focus:border-[#0070f3] transition-all cursor-pointer"
+          className={`w-full sm:w-1/2 px-3.5 py-2.5 rounded-xl border font-bold transition-all ${
+            isAdmin
+              ? 'border-sky-300 bg-sky-50/50 text-slate-900 focus:bg-white focus:outline-none focus:border-[#0070f3] cursor-pointer'
+              : 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none'
+          }`}
         >
+          <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
           <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
           <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
-          <option value="BS. Trần Văn Trực">BS. Trần Văn Trực</option>
+          <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
+          <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
         </select>
       </div>
 

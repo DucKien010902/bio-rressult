@@ -12,11 +12,15 @@ import {
   Req,
   NotFoundException,
   ForbiddenException,
+  UseInterceptors,
+  UploadedFile,
   UseGuards,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { CasesService } from './cases.service.js';
 import { PdfService } from './pdf.service.js';
+import { MinioService, generateMinioObjectKey } from '../minio/minio.service.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -27,6 +31,7 @@ export class CasesController {
   constructor(
     private readonly casesService: CasesService,
     private readonly pdfService: PdfService,
+    private readonly minioService: MinioService,
   ) {}
 
   @Get()
@@ -50,13 +55,18 @@ export class CasesController {
       effectiveDoctor = req.user.fullName || req.user.username;
     }
 
-    return this.casesService.findAll(
-      status,
-      keyword,
-      category,
-      effectiveDoctor,
-      effectiveDonVi,
-    );
+    try {
+      return await this.casesService.findAll(
+        status,
+        keyword,
+        category,
+        effectiveDoctor,
+        effectiveDonVi,
+      );
+    } catch (err: any) {
+      console.error('LỖI GET /cases findAll:', err);
+      throw err;
+    }
   }
 
   // Thống kê & Báo cáo số liệu Dashboard
@@ -117,6 +127,11 @@ export class CasesController {
     return res.send(csvData);
   }
 
+  @Get('sources')
+  async getSources() {
+    return this.casesService.getSources();
+  }
+
   @Get(':id')
   async findOne(@Req() req: any, @Param('id') id: string) {
     const caseItem = await this.casesService.findOne(id);
@@ -155,9 +170,35 @@ export class CasesController {
     return caseItem;
   }
 
-  // Xuất / Tải kết quả file PDF động theo thông tin bệnh nhân
+  // Lấy danh sách các mẫu biểu mẫu PDF có thể chọn cho ca xét nghiệm
+  @Get(':id/pdf-templates')
+  async getPdfTemplates(@Param('id') id: string) {
+    const caseItem = await this.casesService.findOne(id);
+    if (!caseItem) {
+      throw new NotFoundException('Không tìm thấy phiếu xét nghiệm');
+    }
+    const cat = caseItem.loaiXetNghiem || '';
+    const templates = this.pdfService.getAvailableTemplates(cat);
+    const selectedTemplate =
+      caseItem.pdfTemplate ||
+      templates.find((t) => t.isDefault)?.id ||
+      templates[0]?.id;
+
+    return {
+      category: cat,
+      selectedTemplate,
+      templates,
+    };
+  }
+
+  // Xuất / Tải kết quả file PDF động theo thông tin bệnh nhân và mẫu template
   @Get(':id/export-pdf')
-  async exportPdf(@Req() req: any, @Param('id') id: string, @Res() res: Response) {
+  async exportPdf(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Query('template') template: string,
+    @Res() res: Response,
+  ) {
     const caseItem = await this.casesService.findOne(id);
     if (!caseItem) {
       throw new NotFoundException('Không tìm thấy phiếu xét nghiệm');
@@ -174,7 +215,7 @@ export class CasesController {
       );
     }
 
-    const pdfBuffer = await this.pdfService.generateCasePdf(caseItem);
+    const pdfBuffer = await this.pdfService.generateCasePdf(caseItem, template);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -192,6 +233,12 @@ export class CasesController {
     if (req.user?.role === 'lab' && req.user.donVi) {
       data.donVi = req.user.donVi;
     }
+    // Chỉ có Admin mới có quyền gán bác sĩ đọc KQ khi tạo mới
+    if (req.user?.role !== 'admin') {
+      delete data.bacSiDoc;
+      delete data.bacSiDoc2;
+      delete data.doctorName;
+    }
     return this.casesService.create(data);
   }
 
@@ -201,6 +248,12 @@ export class CasesController {
       throw new ForbiddenException(
         'Tài khoản đơn vị không có quyền chỉnh sửa kết quả phiếu!',
       );
+    }
+    // Chỉ có Admin mới có quyền thay đổi bác sĩ đọc KQ
+    if (req.user?.role !== 'admin') {
+      delete data.bacSiDoc;
+      delete data.bacSiDoc2;
+      delete data.doctorName;
     }
     if (
       (req.user?.role === 'doctor' || req.user?.role === 'bacsy') &&
@@ -306,6 +359,90 @@ export class CasesController {
       body.doctorNotes,
       body.doctorName || 'BS Chẩn đoán',
     );
+  }
+
+  // Tải / Thay thế ảnh xét nghiệm lên MinIO Bucket (genhd)
+  @Post(':id/upload-image')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadImage(
+    @Param('id') id: string,
+    @UploadedFile() file: any,
+    @Body('field') field: string = 'anhTeBao',
+    @Body('loaiAnh') loaiAnh: string = 'tieuban',
+  ) {
+    const caseItem = await this.casesService.findOne(id);
+    if (!caseItem) {
+      throw new NotFoundException('Không tìm thấy phiếu xét nghiệm');
+    }
+
+    const targetField = field || 'anhTeBao';
+    const oldUrl = (caseItem as any)[targetField];
+
+    // Xóa file ảnh cũ trên MinIO nếu có
+    if (oldUrl && typeof oldUrl === 'string' && oldUrl.startsWith('http')) {
+      await this.minioService.deleteFile(oldUrl);
+    }
+
+    let fileBuffer: Buffer;
+    let mimeType = 'image/jpeg';
+    let ext = 'jpg';
+
+    if (file && file.buffer) {
+      fileBuffer = file.buffer;
+      mimeType = file.mimetype || 'image/jpeg';
+      ext = file.originalname ? file.originalname.split('.').pop() || 'jpg' : 'jpg';
+    } else {
+      throw new NotFoundException('Vui lòng chọn file ảnh để tải lên');
+    }
+
+    // Quy tắc đặt tên: {loaiXetNghiem}/{maSo}_{tenBenhNhanKhongDau}_{loaiAnh}.jpg (KHÔNG timestamp)
+    const objectKey = generateMinioObjectKey(
+      caseItem.loaiXetNghiem,
+      caseItem.maSo,
+      caseItem.hoTen || caseItem.patientName,
+      loaiAnh,
+      ext,
+    );
+
+    const imageUrl = await this.minioService.uploadFile(fileBuffer, objectKey, mimeType);
+
+    // Cập nhật CHỈ DUY NHẤT trường ảnh đó vào MongoDB
+    const updated = await this.casesService.updateImageField(id, targetField, imageUrl);
+
+    return {
+      success: true,
+      url: imageUrl,
+      case: updated,
+      message: 'Tải ảnh lên MinIO thành công',
+    };
+  }
+
+  // Xóa ảnh xét nghiệm khỏi MinIO & cập nhật rỗng trong MongoDB
+  @Post(':id/delete-image')
+  async deleteImage(
+    @Param('id') id: string,
+    @Body('field') field: string = 'anhTeBao',
+  ) {
+    const caseItem = await this.casesService.findOne(id);
+    if (!caseItem) {
+      throw new NotFoundException('Không tìm thấy phiếu xét nghiệm');
+    }
+
+    const targetField = field || 'anhTeBao';
+    const oldUrl = (caseItem as any)[targetField];
+
+    if (oldUrl && typeof oldUrl === 'string' && oldUrl.startsWith('http')) {
+      await this.minioService.deleteFile(oldUrl);
+    }
+
+    // Cập nhật CHỈ DUY NHẤT trường ảnh đó thành rỗng trong MongoDB
+    const updated = await this.casesService.updateImageField(id, targetField, '');
+
+    return {
+      success: true,
+      case: updated,
+      message: 'Đã xóa ảnh thành công',
+    };
   }
 
   @Delete(':id')

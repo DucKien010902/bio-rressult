@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Dna,
   CheckCircle2,
@@ -12,7 +12,11 @@ import {
   Loader2,
   UploadCloud,
   X,
+  Trash2,
+  RefreshCw,
+  ImageIcon,
 } from 'lucide-react';
+import { getApiUrl, getAuthHeaders } from '@/lib/config';
 
 interface HpvResultCardProps {
   caseData: any;
@@ -21,6 +25,7 @@ interface HpvResultCardProps {
   onToggleSign?: (part?: number) => void;
   isSaving?: boolean;
   isCombo?: boolean;
+  currentUser?: any;
 }
 
 export default function HpvResultCard({
@@ -30,8 +35,12 @@ export default function HpvResultCard({
   onToggleSign,
   isSaving = false,
   isCombo = false,
+  currentUser,
 }: HpvResultCardProps) {
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
   const [collapsed, setCollapsed] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const cat = (caseData?.loaiXetNghiem || 'hpv40').toLowerCase();
   const isHpv40 = cat === 'hpv40' || cat === 'combo_hpv40_cell' || cat === 'combo_hpv40_thinprep';
@@ -44,15 +53,96 @@ export default function HpvResultCard({
     ? 'KẾT QUẢ XÉT NGHIỆM HPV 23 TYPES (REAL-TIME PCR)'
     : 'KẾT QUẢ XÉT NGHIỆM HPV 20 TYPES (REAL-TIME PCR)';
 
-  // Upload handler for HPV Graph
-  const handleGraphUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Xóa ảnh khỏi MinIO & CSDL Mongo
+  const handleDeleteImage = async (field: string = 'anhHpv') => {
+    if (!caseData?._id) {
+      onChange(field, '');
+      return;
+    }
+    if (!window.confirm('Bạn có chắc chắn muốn xóa ảnh biểu đồ này khỏi hệ thống?')) {
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+      const res = await fetch(getApiUrl(`/cases/${caseData._id}/delete-image`), {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ field }),
+      });
+      if (res.ok) {
+        onChange(field, '');
+      } else {
+        alert('Không thể xóa ảnh trên máy chủ!');
+      }
+    } catch (err) {
+      console.error('Lỗi xóa ảnh:', err);
+      alert('Không thể kết nối máy chủ!');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Upload / Thay ảnh mới lên MinIO & CSDL Mongo (Chỉ cập nhật trường ảnh)
+  const handleUploadOrReplaceImage = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: string = 'anhHpv',
+    loaiAnh: string = 'bieudo',
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      onChange('anhHpv', reader.result as string);
-    };
-    reader.readAsDataURL(file);
+
+    if (caseData?.[field]) {
+      if (!window.confirm('Bạn có muốn thay thế ảnh biểu đồ hiện tại bằng ảnh mới chọn?')) {
+        e.target.value = '';
+        return;
+      }
+    }
+
+    // Nếu ca chưa tạo trên DB thì đọc base64 tạm
+    if (!caseData?._id) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        onChange(field, reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('field', field);
+      formData.append('loaiAnh', loaiAnh);
+
+      const headers = getAuthHeaders();
+      delete (headers as any)['Content-Type'];
+
+      const res = await fetch(getApiUrl(`/cases/${caseData._id}/upload-image`), {
+        method: 'POST',
+        headers: headers,
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          onChange(field, data.url);
+        }
+      } else {
+        alert('Có lỗi khi tải ảnh lên MinIO!');
+      }
+    } catch (err) {
+      console.error('Lỗi upload ảnh:', err);
+      alert('Không thể kết nối máy chủ!');
+    } finally {
+      setIsUploadingImage(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   return (
@@ -219,33 +309,58 @@ export default function HpvResultCard({
 
                 <div className="p-4 bg-slate-50/80 rounded-lg border border-slate-200 text-center min-h-[140px] flex flex-col items-center justify-center relative">
                   {caseData?.anhHpv ? (
-                    <div className="relative inline-block group w-full">
+                    <div className="flex flex-col items-center gap-3 w-full">
                       <img
                         src={caseData.anhHpv}
                         alt="Biểu đồ HPV"
-                        className="max-h-56 rounded-lg shadow-sm border border-slate-200 object-contain mx-auto"
+                        className="max-h-56 rounded-lg shadow-sm border border-slate-200 object-contain mx-auto bg-white"
                       />
-                      <button
-                        type="button"
-                        onClick={() => onChange('anhHpv', '')}
-                        className="absolute -top-2 -right-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md cursor-pointer transition-all"
-                        title="Xóa ảnh biểu đồ"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          disabled={isUploadingImage}
+                          onClick={() => handleDeleteImage('anhHpv')}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          <span>Xóa ảnh</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isUploadingImage}
+                          onClick={() => fileInputRef.current?.click()}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isUploadingImage ? 'animate-spin' : ''}`} />
+                          <span>Thay ảnh mới</span>
+                        </button>
+
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          accept="image/*"
+                          onChange={(e) => handleUploadOrReplaceImage(e, 'anhHpv', 'bieudo')}
+                          className="hidden"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
-                      <span className="text-xs italic text-slate-400 block">
+                      <span className="text-xs italic text-slate-400 block mb-1">
                         [ Khung hiển thị đồ thị tín hiệu huỳnh quang Real-time PCR / Đồ thị điện di ]
                       </span>
-                      <label className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs cursor-pointer transition-all">
-                        <UploadCloud className="w-4 h-4 text-sky-600" />
-                        <span>Tải ảnh biểu đồ HPV</span>
+                      <label className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold shadow-2xs cursor-pointer transition-all">
+                        {isUploadingImage ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                        ) : (
+                          <UploadCloud className="w-4 h-4 text-indigo-600" />
+                        )}
+                        <span>{isUploadingImage ? 'Đang tải lên MinIO...' : 'Tải ảnh biểu đồ HPV'}</span>
                         <input
                           type="file"
                           accept="image/*"
-                          onChange={handleGraphUpload}
+                          onChange={(e) => handleUploadOrReplaceImage(e, 'anhHpv', 'bieudo')}
                           className="hidden"
                         />
                       </label>
@@ -292,15 +407,27 @@ export default function HpvResultCard({
               <div>
                 <span className="text-xs text-indigo-800 font-bold block mb-1">
                   {isCombo ? 'Bác sĩ đọc HPV (Phần 1):' : 'Bác sĩ đọc kết quả:'}
+                  {!isAdmin && (
+                    <span className="text-[10px] text-amber-600 font-normal ml-2">
+                      (Chỉ Admin đổi)
+                    </span>
+                  )}
                 </span>
                 <select
+                  disabled={!isAdmin}
                   value={caseData?.bacSiDoc || 'TS . BS Nguyễn Khánh Dương'}
                   onChange={(e) => onChange('bacSiDoc', e.target.value)}
-                  className="form-select text-xs py-1.5 px-3 font-bold text-sky-700 rounded-lg border-sky-300 bg-white shadow-2xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  className={`form-select text-xs py-1.5 px-3 font-bold rounded-lg border shadow-2xs ${
+                    isAdmin
+                      ? 'text-sky-700 border-sky-300 bg-white focus:outline-none focus:border-indigo-500 cursor-pointer'
+                      : 'text-slate-600 border-slate-200 bg-slate-100 cursor-not-allowed select-none'
+                  }`}
                 >
+                  <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
                   <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
                   <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
-                  <option value="BS. Trần Văn Trực">BS. Trần Văn Trực</option>
+                  <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
+                  <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
                 </select>
               </div>
 

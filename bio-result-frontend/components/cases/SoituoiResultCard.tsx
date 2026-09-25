@@ -18,6 +18,7 @@ interface SoituoiResultCardProps {
   onSave: () => void;
   onToggleSign?: () => void;
   isSaving?: boolean;
+  currentUser?: any;
 }
 
 export default function SoituoiResultCard({
@@ -26,7 +27,9 @@ export default function SoituoiResultCard({
   onSave,
   onToggleSign,
   isSaving = false,
+  currentUser,
 }: SoituoiResultCardProps) {
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -245,15 +248,27 @@ export default function SoituoiResultCard({
               <div>
                 <span className="text-xs text-sky-800 font-bold block mb-1">
                   Bác sĩ đọc kết quả:
+                  {!isAdmin && (
+                    <span className="text-[10px] text-amber-600 font-normal ml-2">
+                      (Chỉ Admin đổi)
+                    </span>
+                  )}
                 </span>
                 <select
+                  disabled={!isAdmin}
                   value={caseData?.bacSiDoc || 'BS CK1 PHẠM THẾ HÙNG'}
                   onChange={(e) => onChange('bacSiDoc', e.target.value)}
-                  className="form-select text-xs py-1.5 px-3 font-bold text-sky-700 rounded-lg border-sky-300 bg-white shadow-2xs focus:outline-none focus:border-sky-500 cursor-pointer"
+                  className={`form-select text-xs py-1.5 px-3 font-bold rounded-lg border shadow-2xs ${
+                    isAdmin
+                      ? 'text-sky-700 border-sky-300 bg-white focus:outline-none focus:border-sky-500 cursor-pointer'
+                      : 'text-slate-600 border-slate-200 bg-slate-100 cursor-not-allowed select-none'
+                  }`}
                 >
-                  <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
+                  <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
                   <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
-                  <option value="BS. Trần Văn Trực">BS. Trần Văn Trực</option>
+                  <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
+                  <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
+                  <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
                 </select>
               </div>
 

@@ -12,6 +12,7 @@ export class SoituoiPdfService extends BasePdfService {
     caseItem: any,
     fontR: PDFFont,
     fontB: PDFFont,
+    templateId?: string,
   ) {
     const pg = pdfDoc.getPages()[0];
 

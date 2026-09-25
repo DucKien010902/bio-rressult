@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   FileText,
   CheckCircle2,
@@ -13,7 +13,10 @@ import {
   ImageIcon,
   UploadCloud,
   X,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react';
+import { getApiUrl, getAuthHeaders } from '@/lib/config';
 
 interface GiaiphaubenhResultCardProps {
   caseData: any;
@@ -21,6 +24,7 @@ interface GiaiphaubenhResultCardProps {
   onSave: () => void;
   onToggleSign?: () => void;
   isSaving?: boolean;
+  currentUser?: any;
 }
 
 export default function GiaiphaubenhResultCard({
@@ -29,18 +33,103 @@ export default function GiaiphaubenhResultCard({
   onSave,
   onToggleSign,
   isSaving = false,
+  currentUser,
 }: GiaiphaubenhResultCardProps) {
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
   const [collapsed, setCollapsed] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Upload handler for GPB image
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Xóa ảnh khỏi MinIO & CSDL Mongo
+  const handleDeleteImage = async (field: string = 'anhTeBao') => {
+    if (!caseData?._id) {
+      onChange(field, '');
+      return;
+    }
+    if (!window.confirm('Bạn có chắc chắn muốn xóa ảnh này khỏi hệ thống?')) {
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+      const res = await fetch(getApiUrl(`/cases/${caseData._id}/delete-image`), {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ field }),
+      });
+      if (res.ok) {
+        onChange(field, '');
+      } else {
+        alert('Không thể xóa ảnh trên máy chủ!');
+      }
+    } catch (err) {
+      console.error('Lỗi xóa ảnh:', err);
+      alert('Không thể kết nối máy chủ!');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Upload / Thay ảnh mới lên MinIO & CSDL Mongo (Chỉ cập nhật trường ảnh)
+  const handleUploadOrReplaceImage = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: string = 'anhTeBao',
+    loaiAnh: string = 'gpb',
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      onChange('anhTeBao', reader.result as string);
-    };
-    reader.readAsDataURL(file);
+
+    if (caseData?.[field]) {
+      if (!window.confirm('Bạn có muốn thay thế ảnh hiện tại bằng ảnh mới chọn?')) {
+        e.target.value = '';
+        return;
+      }
+    }
+
+    // Nếu ca chưa tạo trên DB thì đọc base64 tạm
+    if (!caseData?._id) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        onChange(field, reader.result as string);
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('field', field);
+      formData.append('loaiAnh', loaiAnh);
+
+      const headers = getAuthHeaders();
+      delete (headers as any)['Content-Type'];
+
+      const res = await fetch(getApiUrl(`/cases/${caseData._id}/upload-image`), {
+        method: 'POST',
+        headers: headers,
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) {
+          onChange(field, data.url);
+        }
+      } else {
+        alert('Có lỗi khi tải ảnh lên MinIO!');
+      }
+    } catch (err) {
+      console.error('Lỗi upload ảnh:', err);
+      alert('Không thể kết nối máy chủ!');
+    } finally {
+      setIsUploadingImage(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   return (
@@ -138,52 +227,75 @@ export default function GiaiphaubenhResultCard({
 
           {/* Field 5: Ảnh tiêu bản giải phẫu bệnh */}
           <div className="space-y-2 pt-2 border-t border-slate-100">
-            <label className="font-bold text-slate-700 text-xs block flex items-center gap-1.5">
+            <label className="font-bold text-slate-700 text-xs flex items-center gap-1.5">
               <ImageIcon className="w-4 h-4 text-amber-600" />
               <span>Ảnh tiêu bản giải phẫu bệnh (Kính hiển vi)</span>
             </label>
 
-            <div className="relative border-2 border-dashed border-amber-200 hover:border-amber-400 bg-amber-50/20 hover:bg-amber-50/50 rounded-2xl p-6 transition-all text-center">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              />
+            {caseData?.anhTeBao ? (
+              <div className="flex flex-col items-center gap-3 p-4 bg-slate-50/70 rounded-2xl border border-slate-200">
+                <img
+                  src={caseData.anhTeBao}
+                  alt="Tiêu bản giải phẫu bệnh"
+                  className="max-h-56 rounded-xl shadow-md border border-slate-200 object-contain mx-auto bg-white"
+                />
 
-              {caseData?.anhTeBao ? (
-                <div className="relative inline-block group">
-                  <img
-                    src={caseData.anhTeBao}
-                    alt="Tiêu bản giải phẫu bệnh"
-                    className="max-h-56 rounded-xl shadow-md border border-slate-200 object-contain mx-auto"
-                  />
+                {/* 2 Nút bấm riêng biệt */}
+                <div className="flex items-center justify-center gap-3 pt-1">
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onChange('anhTeBao', '');
-                    }}
-                    className="absolute -top-2 -right-2 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md z-20 cursor-pointer transition-all"
-                    title="Xóa ảnh"
+                    disabled={isUploadingImage}
+                    onClick={() => handleDeleteImage('anhTeBao')}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
                   >
-                    <X className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Xóa ảnh</span>
                   </button>
+
+                  <button
+                    type="button"
+                    disabled={isUploadingImage}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-amber-600 ${isUploadingImage ? 'animate-spin' : ''}`} />
+                    <span>Thay ảnh mới</span>
+                  </button>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    onChange={(e) => handleUploadOrReplaceImage(e, 'anhTeBao', 'gpb')}
+                    className="hidden"
+                  />
                 </div>
-              ) : (
+              </div>
+            ) : (
+              <div className="relative border-2 border-dashed border-amber-200 hover:border-amber-400 bg-amber-50/20 hover:bg-amber-50/50 rounded-2xl p-6 transition-all text-center">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleUploadOrReplaceImage(e, 'anhTeBao', 'gpb')}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
                 <div className="flex flex-col items-center justify-center gap-2 py-3">
                   <div className="p-3 bg-amber-100/80 text-amber-600 rounded-full">
-                    <UploadCloud className="w-7 h-7" />
+                    {isUploadingImage ? (
+                      <Loader2 className="w-7 h-7 animate-spin text-amber-600" />
+                    ) : (
+                      <UploadCloud className="w-7 h-7" />
+                    )}
                   </div>
                   <p className="text-xs font-bold text-slate-700">
-                    Nhấp hoặc kéo thả file vào đây
+                    {isUploadingImage ? 'Đang tải ảnh lên MinIO...' : 'Nhấp hoặc kéo thả file vào đây'}
                   </p>
                   <p className="text-[11px] text-slate-400 font-medium">
                     Định dạng hỗ trợ: image/*
                   </p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Field 6: KẾT LUẬN & KHUYẾN NGHỊ */}
@@ -222,15 +334,27 @@ export default function GiaiphaubenhResultCard({
               <div>
                 <span className="text-xs text-amber-900 font-bold block mb-1">
                   Bác sĩ đọc kết quả:
+                  {!isAdmin && (
+                    <span className="text-[10px] text-amber-600 font-normal ml-2">
+                      (Chỉ Admin đổi)
+                    </span>
+                  )}
                 </span>
                 <select
+                  disabled={!isAdmin}
                   value={caseData?.bacSiDoc || 'BS CK1 PHẠM THẾ HÙNG'}
                   onChange={(e) => onChange('bacSiDoc', e.target.value)}
-                  className="form-select text-xs py-1.5 px-3 font-bold text-amber-900 rounded-lg border-amber-300 bg-white shadow-2xs focus:outline-none focus:border-amber-500 cursor-pointer"
+                  className={`form-select text-xs py-1.5 px-3 font-bold rounded-lg border shadow-2xs ${
+                    isAdmin
+                      ? 'text-amber-900 border-amber-300 bg-white focus:outline-none focus:border-amber-500 cursor-pointer'
+                      : 'text-slate-600 border-slate-200 bg-slate-100 cursor-not-allowed select-none'
+                  }`}
                 >
-                  <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
+                  <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
                   <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
-                  <option value="BS. Trần Văn Trực">BS. Trần Văn Trực</option>
+                  <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
+                  <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
+                  <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
                 </select>
               </div>
 

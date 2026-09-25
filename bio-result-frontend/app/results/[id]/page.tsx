@@ -169,10 +169,12 @@ export default function CaseDetailPage() {
   };
 
   // Download PDF helper
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = (templateId?: string) => {
     if (!id) return;
-    const token = localStorage.getItem('bio_token') || '';
-    window.open(getApiUrl(`/cases/${id}/export-pdf?token=${encodeURIComponent(token)}`), '_blank');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('bio_token') || '' : '';
+    const tpl = templateId || caseData?.pdfTemplate || '';
+    const query = tpl ? `&template=${encodeURIComponent(tpl)}` : '';
+    window.open(getApiUrl(`/cases/${id}/export-pdf?token=${encodeURIComponent(token)}${query}`), '_blank');
   };
 
   const currentCategory =
@@ -286,7 +288,7 @@ export default function CaseDetailPage() {
 
                   <button
                     type="button"
-                    onClick={handleDownloadPdf}
+                    onClick={() => handleDownloadPdf()}
                     className="flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs"
                   >
                     <Download className="w-4 h-4 text-emerald-600" />
@@ -301,6 +303,7 @@ export default function CaseDetailPage() {
                 onChange={handleFieldChange}
                 onSave={handleSaveChanges}
                 isSaving={isSaving}
+                currentUser={currentUser}
               />
 
               {/* Card 2: Kết quả xét nghiệm theo dịch vụ */}
@@ -313,6 +316,7 @@ export default function CaseDetailPage() {
                     onToggleSign={handleToggleSign}
                     isSaving={isSaving}
                     isCombo={true}
+                    currentUser={currentUser}
                   />
                   <CellResultCard
                     caseData={caseData}
@@ -321,6 +325,7 @@ export default function CaseDetailPage() {
                     onToggleSign={handleToggleSign}
                     isSaving={isSaving}
                     isCombo={true}
+                    currentUser={currentUser}
                   />
                 </>
               ) : ['cell', 'thinprep'].includes(caseData?.loaiXetNghiem) ? (
@@ -330,6 +335,7 @@ export default function CaseDetailPage() {
                   onSave={handleSaveChanges}
                   onToggleSign={handleToggleSign}
                   isSaving={isSaving}
+                  currentUser={currentUser}
                 />
               ) : caseData?.loaiXetNghiem === 'soituoi' ? (
                 <SoituoiResultCard
@@ -338,6 +344,7 @@ export default function CaseDetailPage() {
                   onSave={handleSaveChanges}
                   onToggleSign={handleToggleSign}
                   isSaving={isSaving}
+                  currentUser={currentUser}
                 />
               ) : caseData?.loaiXetNghiem === 'giaiphaubenh' ? (
                 <GiaiphaubenhResultCard
@@ -346,6 +353,7 @@ export default function CaseDetailPage() {
                   onSave={handleSaveChanges}
                   onToggleSign={handleToggleSign}
                   isSaving={isSaving}
+                  currentUser={currentUser}
                 />
               ) : (
                 <HpvResultCard
@@ -354,6 +362,7 @@ export default function CaseDetailPage() {
                   onSave={handleSaveChanges}
                   onToggleSign={handleToggleSign}
                   isSaving={isSaving}
+                  currentUser={currentUser}
                 />
               )}
 
@@ -361,7 +370,11 @@ export default function CaseDetailPage() {
               <PdfPreviewSection
                 caseId={id}
                 patientName={caseData?.hoTen}
+                currentTemplate={caseData?.pdfTemplate}
                 onDownload={handleDownloadPdf}
+                onTemplateChange={(tplId) => {
+                  setCaseData((prev: any) => ({ ...prev, pdfTemplate: tplId }));
+                }}
               />
 
               {/* Floating Sticky Bottom Bar */}

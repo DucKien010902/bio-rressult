@@ -16,10 +16,13 @@ import { SoituoiPdfService } from './pdf-services/soituoi-pdf.service.js';
 import { GiaiphaubenhPdfService } from './pdf-services/giaiphaubenh-pdf.service.js';
 import { ComboPdfService } from './pdf-services/combo-pdf.service.js';
 
+import { MinioModule } from '../minio/minio.module.js';
+
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: BioCase.name, schema: BioCaseSchema }]),
     AuthModule,
+    MinioModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

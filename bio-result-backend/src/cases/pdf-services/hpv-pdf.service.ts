@@ -14,6 +14,7 @@ export class HpvPdfService extends BasePdfService {
     fontR: PDFFont,
     fontB: PDFFont,
     pageIndex = 0,
+    templateId?: string,
   ) {
     const pg = pdfDoc.getPages()[pageIndex];
 

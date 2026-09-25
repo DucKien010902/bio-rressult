@@ -52,6 +52,9 @@ export class BioCase extends Document {
   @Prop({ default: '', index: true })
   loaiXetNghiem!: string; // 'cell', 'thinprep', 'hpv40', 'hpv20', 'combo...', 'soituoi', 'giaiphaubenh'
 
+  @Prop({ default: '' })
+  pdfTemplate!: string; // Mã mẫu template PDF được chọn (nếu có nhiều loại)
+
   // --- Thông tin hành chính bệnh nhân ---
   @Prop({ required: true })
   hoTen!: string;

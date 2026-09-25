@@ -8,13 +8,15 @@ import {
   Calendar,
   User as UserIcon,
   MoreVertical,
-  Eye,
   Download,
   Edit3,
   Trash2,
   CheckCircle2,
   Clock,
   FlaskConical,
+  FileText,
+  X,
+  Loader2,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -72,6 +74,43 @@ export default function CaseTable({
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [openActionId, setOpenActionId] = useState<string | null>(null);
+
+  // Admin permission
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+
+  // Accept sample modal states
+  const [showAcceptModal, setShowAcceptModal] = useState(false);
+  const [selectedCaseForAccept, setSelectedCaseForAccept] = useState<CaseItem | null>(null);
+  const [selectedDoctorForAccept, setSelectedDoctorForAccept] = useState('TS.BS Nguyễn Sỹ Lãnh');
+  const [isAccepting, setIsAccepting] = useState(false);
+
+  const handleAcceptCase = async (goToDetail: boolean = false) => {
+    if (!selectedCaseForAccept) return;
+    setIsAccepting(true);
+    try {
+      const res = await fetch(getApiUrl(`/cases/${selectedCaseForAccept._id}/accept`), {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ bacSiDoc: selectedDoctorForAccept }),
+      });
+      if (res.ok) {
+        setShowAcceptModal(false);
+        if (goToDetail) {
+          router.push(`/results/${selectedCaseForAccept._id}`);
+        } else {
+          onRefresh();
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.message || 'Không thể tiếp nhận ca xét nghiệm!');
+      }
+    } catch (err) {
+      console.error('Error accepting case:', err);
+      alert('Không thể kết nối đến máy chủ!');
+    } finally {
+      setIsAccepting(false);
+    }
+  };
 
   // Pagination states (mặc định tối đa 20 bản ghi / trang)
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -324,24 +363,26 @@ export default function CaseTable({
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <span className="flex items-center gap-1 font-semibold text-slate-700">
-              <UserIcon className="w-4 h-4 text-purple-600" />
-              Lọc theo nguồn:
-            </span>
-            <select
-              value={selectedSource}
-              onChange={(e) => setSelectedSource(e.target.value)}
-              className="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 text-sm font-medium focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
-            >
-              <option value="all">-- Tất cả nguồn tạo --</option>
-              {sources.map((src) => (
-                <option key={src} value={src}>
-                  {src}
-                </option>
-              ))}
-            </select>
-          </div>
+          {isAdmin && (
+            <div className="flex items-center gap-2.5">
+              <span className="flex items-center gap-1 font-semibold text-slate-700">
+                <UserIcon className="w-4 h-4 text-purple-600" />
+                Lọc theo nguồn:
+              </span>
+              <select
+                value={selectedSource}
+                onChange={(e) => setSelectedSource(e.target.value)}
+                className="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 text-sm font-medium focus:bg-white focus:outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value="all">-- Tất cả nguồn tạo --</option>
+                {sources.map((src) => (
+                  <option key={src} value={src}>
+                    {src}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -354,25 +395,25 @@ export default function CaseTable({
                 <th className="py-3.5 px-4 font-bold">MÃ SỐ</th>
                 <th className="py-3.5 px-4 font-bold">HỌ VÀ TÊN</th>
                 <th className="py-3.5 px-3 font-bold text-center">NĂM SINH</th>
-                <th className="py-3.5 px-4 font-bold">NGUỒN</th>
+                {isAdmin && <th className="py-3.5 px-4 font-bold">NGUỒN</th>}
                 <th className="py-3.5 px-4 font-bold">BS ĐỌC KQ</th>
                 <th className="py-3.5 px-4 font-bold text-center">TRẠNG THÁI</th>
                 <th className="py-3.5 px-4 font-bold">THỜI GIAN TRẢ / DỰ KIẾN</th>
                 <th className="py-3.5 px-3 font-bold text-center">NGÀY TẠO</th>
-                <th className="py-3.5 px-3 font-bold text-center">THAO TÁC</th>
+                <th className="py-3.5 px-4 font-bold text-right pr-6">THAO TÁC</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={isAdmin ? 9 : 8} className="py-12 text-center text-slate-400 font-medium">
                     Đang tải danh sách phiếu xét nghiệm...
                   </td>
                 </tr>
               ) : filteredCases.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={isAdmin ? 9 : 8} className="py-12 text-center text-slate-400 font-medium">
                     Không tìm thấy ca xét nghiệm nào phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -390,13 +431,12 @@ export default function CaseTable({
                   return (
                     <tr
                       key={item._id}
-                      className="hover:bg-sky-50/30 transition-colors group"
+                      onClick={() => router.push(`/results/${item._id}`)}
+                      className="hover:bg-sky-50/40 transition-colors cursor-pointer group"
                     >
-                      {/* Mã số -> Link sang /results/[id] */}
-                      <td className="py-3.5 px-4 font-bold text-[#0070f3] hover:underline cursor-pointer">
-                        <Link href={`/results/${item._id}`}>
-                          {item.maSo}
-                        </Link>
+                      {/* Mã số */}
+                      <td className="py-3.5 px-4 font-bold text-[#0070f3] hover:underline">
+                        <span>{item.maSo}</span>
                       </td>
 
                       {/* Họ và tên */}
@@ -409,13 +449,15 @@ export default function CaseTable({
                         {item.namSinh || '---'}
                       </td>
 
-                      {/* Nguồn */}
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                          <UserIcon className="w-3 h-3 text-slate-400" />
-                          <span className="truncate max-w-[120px]">{sourceName}</span>
-                        </span>
-                      </td>
+                      {/* Nguồn (Chỉ hiển thị với Admin) */}
+                      {isAdmin && (
+                        <td className="py-3.5 px-4">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                            <UserIcon className="w-3 h-3 text-slate-400" />
+                            <span className="truncate max-w-[120px]">{sourceName}</span>
+                          </span>
+                        </td>
+                      )}
 
                       {/* Bác sĩ đọc kết quả */}
                       <td className="py-3.5 px-4">
@@ -479,35 +521,52 @@ export default function CaseTable({
                         {createdDate}
                       </td>
 
-                      {/* Thao tác Dropdown */}
-                      <td className="py-3.5 px-3 text-center relative">
-                        <button
-                          onClick={() =>
-                            setOpenActionId(openActionId === item._id ? null : item._id)
-                          }
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
+                      {/* Thao tác */}
+                      <td
+                        className="py-3.5 px-4 text-right relative pr-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Nút Nhận mẫu (Chỉ hiển thị với Admin khi trạng thái là Nhập thông tin) */}
+                          {isAdmin && item.trangThai === 'nhap_thong_tin' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenActionId(null);
+                                setSelectedCaseForAccept(item);
+                                setSelectedDoctorForAccept(item.bacSiDoc || 'TS.BS Nguyễn Sỹ Lãnh');
+                                setShowAcceptModal(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#00a86b] hover:bg-[#008f5a] text-white rounded-lg text-[11px] font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 leading-tight text-left"
+                              title="Nhận mẫu & Phân công bác sĩ"
+                            >
+                              <FileText className="w-3 h-3 shrink-0" />
+                              <span>
+                                Nhận<br />mẫu
+                              </span>
+                            </button>
+                          )}
+
+                          {/* 3 dots menu button - luôn cố định sát lề phải */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenActionId(openActionId === item._id ? null : item._id);
+                            }}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </div>
 
                         {openActionId === item._id && (
                           <div
                             className="absolute right-4 top-10 w-44 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-40 text-left animate-in fade-in slide-in-from-top-1"
                             onMouseLeave={() => setOpenActionId(null)}
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            {/* 1. Xem chi tiết -> /results/[id] */}
-                            <button
-                              onClick={() => {
-                                setOpenActionId(null);
-                                router.push(`/results/${item._id}`);
-                              }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-[#0070f3] transition-colors cursor-pointer"
-                            >
-                              <Eye className="w-4 h-4 text-[#0070f3]" />
-                              <span>Xem chi tiết</span>
-                            </button>
-
-                            {/* 2. Tải kết quả (PDF) */}
+                            {/* 1. Tải kết quả (PDF) */}
                             <button
                               onClick={() => {
                                 setOpenActionId(null);
@@ -522,7 +581,7 @@ export default function CaseTable({
                               <span>Tải kết quả (PDF)</span>
                             </button>
 
-                            {/* 3. Sửa thông tin phiếu -> /results/[id] */}
+                            {/* 2. Sửa thông tin phiếu */}
                             <button
                               onClick={() => {
                                 setOpenActionId(null);
@@ -534,8 +593,8 @@ export default function CaseTable({
                               <span>Sửa thông tin phiếu</span>
                             </button>
 
-                            {/* 4. Xóa phiếu (Chỉ dành cho Admin phòng Lab) */}
-                            {currentUser?.role === 'admin' && (
+                            {/* 3. Xóa phiếu (Chỉ dành cho Admin phòng Lab) */}
+                            {isAdmin && (
                               <>
                                 <div className="border-t border-slate-100 my-1" />
                                 <button
@@ -645,6 +704,125 @@ export default function CaseTable({
           )}
         </div>
       </div>
+
+      {/* MODAL TIẾP NHẬN MẪU & PHÂN BÁC SĨ (DÀNH CHO ADMIN) */}
+      {showAcceptModal && selectedCaseForAccept && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setShowAcceptModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-4 bg-emerald-50/70 border-b border-emerald-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#00a86b] text-white flex items-center justify-center shadow-xs">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                    Tiếp nhận mẫu xét nghiệm
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    Mã số: <span className="font-bold text-slate-800">{selectedCaseForAccept.maSo}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAcceptModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div className="bg-slate-50 rounded-xl p-3.5 space-y-2 border border-slate-100 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Bệnh nhân:</span>
+                  <span className="font-bold text-slate-800 uppercase">
+                    {selectedCaseForAccept.hoTen} ({selectedCaseForAccept.namSinh || '---'})
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Dịch vụ xét nghiệm:</span>
+                  <span className="font-bold text-blue-700 uppercase">
+                    {selectedCaseForAccept.loaiXetNghiem}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Nguồn gửi mẫu:</span>
+                  <span className="font-semibold text-slate-700">
+                    {selectedCaseForAccept.donVi || 'Gentech Lab'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Ngày nhận mẫu:</span>
+                  <span className="font-semibold text-slate-700">
+                    {selectedCaseForAccept.ngayNhanMau || new Date().toISOString().split('T')[0]}
+                  </span>
+                </div>
+              </div>
+
+              {/* Phân công bác sĩ */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Phân công Bác sĩ đọc kết quả:
+                </label>
+                <select
+                  value={selectedDoctorForAccept}
+                  onChange={(e) => setSelectedDoctorForAccept(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer shadow-2xs"
+                >
+                  <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
+                  <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
+                  <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
+                  <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
+                  <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Sau khi tiếp nhận, ca xét nghiệm sẽ chuyển sang trạng thái <strong>Chạy kết quả</strong>.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowAcceptModal(false)}
+                className="px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              >
+                Hủy bỏ
+              </button>
+
+              <button
+                type="button"
+                disabled={isAccepting}
+                onClick={() => handleAcceptCase(false)}
+                className="px-4 py-2 bg-[#00a86b] hover:bg-[#008f5a] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isAccepting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Tiếp nhận mẫu</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isAccepting}
+                onClick={() => handleAcceptCase(true)}
+                className="px-4 py-2 bg-[#0070f3] hover:bg-[#005bb5] text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isAccepting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Tiếp nhận & Vào nhập kết quả</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

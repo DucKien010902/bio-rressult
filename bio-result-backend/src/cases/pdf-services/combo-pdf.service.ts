@@ -21,7 +21,11 @@ export class ComboPdfService extends BasePdfService {
    * Trang 1: Phôi HPV tương ứng (HPV 20 / 40 / 23)
    * Trang 2: Phôi Tế bào học tương ứng (Cell / ThinPrep)
    */
-  async generateComboPdf(caseItem: any, cat: string): Promise<Buffer> {
+  async generateComboPdf(
+    caseItem: any,
+    cat: string,
+    templateId?: string,
+  ): Promise<Buffer> {
     const hpvCat = cat.includes('hpv40')
       ? 'hpv40'
       : cat.includes('hpv23')

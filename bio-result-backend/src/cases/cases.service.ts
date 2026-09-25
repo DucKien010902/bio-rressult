@@ -84,6 +84,27 @@ export class CasesService {
     return found;
   }
 
+  async getSources(): Promise<string[]> {
+    const listDonVi = await this.caseModel.distinct('donVi').exec();
+    const listNguoiNhap = await this.caseModel.distinct('nguoiNhap').exec();
+    const sourcesSet = new Set<string>();
+    sourcesSet.add('Quản trị viên (Admin)');
+    sourcesSet.add('PK ĐẠI DƯƠNG ĐH');
+    sourcesSet.add('BVĐK Ngã Tư Hồ');
+    sourcesSet.add('Phòng khám Medilab');
+    sourcesSet.add('Phòng Khám Thiên Đức');
+    sourcesSet.add('Bệnh Viện Phụ Sản Hà Nội');
+    sourcesSet.add('Bệnh Viện ĐHQG');
+
+    listDonVi.forEach((s) => {
+      if (s && typeof s === 'string' && s.trim()) sourcesSet.add(s.trim());
+    });
+    listNguoiNhap.forEach((s) => {
+      if (s && typeof s === 'string' && s.trim()) sourcesSet.add(s.trim());
+    });
+    return Array.from(sourcesSet);
+  }
+
   async create(data: Partial<BioCase>): Promise<BioCase> {
     const newCase = new this.caseModel({
       ...data,
@@ -429,5 +450,29 @@ export class CasesService {
     }
 
     return csv;
+  }
+
+  async updateImageField(id: string, field: string, imageUrl: string): Promise<BioCase> {
+    const allowedFields = [
+      'anhTeBao',
+      'anhGpb',
+      'anhSoiTuoi',
+      'anhKy',
+      'anhSoiTuoi1',
+      'anhSoiTuoi2',
+      'anhKy2',
+    ];
+    if (!allowedFields.includes(field)) {
+      throw new Error(`Trường ảnh '${field}' không hợp lệ`);
+    }
+
+    const updated = await this.caseModel
+      .findByIdAndUpdate(id, { $set: { [field]: imageUrl } }, { new: true })
+      .exec();
+
+    if (!updated) {
+      throw new NotFoundException('Không tìm thấy phiếu xét nghiệm');
+    }
+    return updated;
   }
 }

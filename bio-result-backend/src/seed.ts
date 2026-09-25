@@ -289,7 +289,7 @@ async function seed() {
       existing.isActive = item.isActive;
       await existing.save();
     } else {
-      await UserModel.create(item);
+      await UserModel.create(item as any);
     }
   }
   console.log(`Đã cập nhật ${initialUsers.length} tài khoản người dùng!`);
@@ -374,6 +374,7 @@ async function seed() {
         trangThai,
         status: trangThai,
         daKy,
+        pdfTemplate: `${cat}_default`,
       };
 
       // A. CELL & THINPREP
@@ -589,8 +590,8 @@ async function seed() {
       else if (cat.startsWith('combo_')) {
         baseCase.anhTeBao = imgDataUri;
         baseCase.hienBieuDo = true;
-        baseCase.bacSiDoc2 = 'TS . BS Nguyễn Khánh Dương';
-        baseCase.doctorName = 'TS . BS Nguyễn Khánh Dương';
+        baseCase.bacSiDoc2 = bacSiDoc;
+        baseCase.doctorName = bacSiDoc;
         baseCase.daKy2 = daKy;
         baseCase.ngayXetNghiem2 = ngayTra;
 

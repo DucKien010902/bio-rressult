@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Sidebar, { MENU_CATEGORIES } from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import CaseTable, { CaseItem } from '@/components/cases/CaseTable';
-import CaseCreateModal from '@/components/cases/CaseCreateModal';
 import DashboardView from '@/components/dashboard/DashboardView';
 import { Plus, FileSpreadsheet } from 'lucide-react';
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
@@ -25,7 +24,6 @@ function DashboardContent() {
 
   // Layout states
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // Data states
@@ -153,7 +151,13 @@ function DashboardContent() {
                 <div className="flex items-center gap-3">
                   {currentUser?.role !== 'doctor' && (
                     <button
-                      onClick={() => setShowCreateModal(true)}
+                      onClick={() =>
+                        router.push(
+                          activeCategory && activeCategory !== 'dashboard'
+                            ? `/results/new?category=${activeCategory}`
+                            : '/results/new'
+                        )
+                      }
                       className="flex items-center gap-2 px-4 py-2.5 bg-[#0070f3] hover:bg-[#005bb5] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
                     >
                       <Plus className="w-4 h-4" />
@@ -207,17 +211,7 @@ function DashboardContent() {
         </main>
       </div>
 
-      {/* 3. MODAL THÊM MỚI PHIẾU */}
-      <CaseCreateModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={fetchCases}
-        activeCategory={activeCategory}
-        categoryLabel={activeCategoryObj.label}
-        currentUser={currentUser}
-      />
-
-      {/* 4. MODAL XÁC NHẬN ĐĂNG XUẤT */}
+      {/* 3. MODAL XÁC NHẬN ĐĂNG XUẤT */}
       <LogoutConfirmModal
         isOpen={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
