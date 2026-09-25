@@ -38,7 +38,6 @@ export const MENU_CATEGORIES: CategoryItem[] = [
   { id: 'combo_hpv20_thinprep', label: 'Combo: HPV 20 + ThinPrep', icon: Layers },
   { id: 'combo_hpv40_thinprep', label: 'Combo: HPV 40 + ThinPrep', icon: Layers },
   { id: 'combo_hpv23_thinprep', label: 'Combo: HPV 23 + ThinPrep', icon: Layers },
-  { id: 'adn-convert', label: 'Xét Nghiệm ADN', icon: Dna },
 ];
 
 interface SidebarProps {

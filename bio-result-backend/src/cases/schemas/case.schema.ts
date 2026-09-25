@@ -43,7 +43,7 @@ export class EditHistory {
 
 export const EditHistorySchema = SchemaFactory.createForClass(EditHistory);
 
-@Schema({ timestamps: true, collection: 'biocases' })
+@Schema({ timestamps: true, collection: 'biocases', strict: false })
 export class BioCase extends Document {
   // --- Mã số & Phân loại dịch vụ ---
   @Prop({ required: true, unique: true, index: true })
@@ -132,6 +132,44 @@ export class BioCase extends Document {
 
   @Prop({ default: '' })
   batThuongKhac!: string;
+
+  // --- Ảnh tiêu bản tế bào học / Giải phẫu bệnh ---
+  @Prop({ default: '' })
+  anhTeBao!: string;
+
+  @Prop({ default: '' })
+  anhGpb!: string;
+
+  // --- Chuyên môn: Soi tươi dịch âm đạo ---
+  @Prop({ default: '' })
+  soiTuoiBachCau!: string;
+
+  @Prop({ default: '' })
+  soiTuoiNam!: string;
+
+  @Prop({ default: '' })
+  soiTuoiTapKhuan!: string;
+
+  @Prop({ default: '' })
+  soiTuoiTeBaoBieuMo!: string;
+
+  @Prop({ default: '' })
+  soiTuoiTrichomonas!: string;
+
+  @Prop({ default: '' })
+  soiTuoiGhiChuBachCau!: string;
+
+  @Prop({ default: '' })
+  soiTuoiGhiChuNam!: string;
+
+  @Prop({ default: '' })
+  soiTuoiGhiChuTapKhuan!: string;
+
+  @Prop({ default: '' })
+  soiTuoiGhiChuTeBaoBieuMo!: string;
+
+  @Prop({ default: '' })
+  soiTuoiGhiChuTrichomonas!: string;
 
   // --- Chuyên môn: Xét nghiệm HPV (Vi sinh phân tử) ---
   @Prop({ default: '' })

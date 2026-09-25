@@ -377,10 +377,10 @@ export default function CellResultCard({
               <textarea
                 rows={3}
                 value={
-                  caseData?.ketLuan ||
+                  (isCombo ? caseData?.ketLuan2 : caseData?.ketLuan) ||
                   'KHÔNG THẤY TẾ BÀO BẤT THƯỜNG TRÊN PHIẾN ĐỒ'
                 }
-                onChange={(e) => onChange('ketLuan', e.target.value)}
+                onChange={(e) => onChange(isCombo ? 'ketLuan2' : 'ketLuan', e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-sky-200 bg-sky-50/30 text-xs font-bold text-sky-900 focus:bg-white focus:outline-none focus:border-[#0070f3] transition-all"
               />
             </div>

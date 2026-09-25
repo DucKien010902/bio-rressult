@@ -40,6 +40,13 @@ export class PdfService {
     };
 
     const cat = (caseItem?.loaiXetNghiem || '').toLowerCase();
+
+    // Đối với 6 gói Combo 2 trang (HPV + Cell / ThinPrep):
+    // Tự động ghép Trang 1 (Phôi HPV tương ứng) và Trang 2 (Phôi Cell/ThinPrep)
+    if (cat.startsWith('combo_')) {
+      return this.comboPdfService.generateComboPdf(caseItem, cat);
+    }
+
     const tFileName = templateMap[cat] || 'sample_hpv20.pdf';
     let tPath = path.join(process.cwd(), 'templates', tFileName);
     if (!fs.existsSync(tPath) && cat === 'hpv20') {
