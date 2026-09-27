@@ -17,6 +17,7 @@ import {
   ImageIcon,
 } from 'lucide-react';
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
+import { toast } from '@/components/common/Toast';
 
 interface HpvResultCardProps {
   caseData: any;
@@ -75,12 +76,13 @@ export default function HpvResultCard({
       });
       if (res.ok) {
         onChange(field, '');
+        toast.success('Đã xóa ảnh thành công!', 'Xóa ảnh');
       } else {
-        alert('Không thể xóa ảnh trên máy chủ!');
+        toast.error('Không thể xóa ảnh trên máy chủ!', 'Xóa ảnh thất bại');
       }
     } catch (err) {
       console.error('Lỗi xóa ảnh:', err);
-      alert('Không thể kết nối máy chủ!');
+      toast.error('Không thể kết nối máy chủ!', 'Lỗi kết nối');
     } finally {
       setIsUploadingImage(false);
     }
@@ -107,6 +109,7 @@ export default function HpvResultCard({
       const reader = new FileReader();
       reader.onload = () => {
         onChange(field, reader.result as string);
+        toast.success('Đã chọn ảnh biểu đồ mới!');
       };
       reader.readAsDataURL(file);
       return;
@@ -132,13 +135,14 @@ export default function HpvResultCard({
         const data = await res.json();
         if (data.url) {
           onChange(field, data.url);
+          toast.success('Tải ảnh biểu đồ lên thành công!', 'Tải ảnh thành công');
         }
       } else {
-        alert('Có lỗi khi tải ảnh lên MinIO!');
+        toast.error('Có lỗi khi tải ảnh lên máy chủ!', 'Tải ảnh thất bại');
       }
     } catch (err) {
       console.error('Lỗi upload ảnh:', err);
-      alert('Không thể kết nối máy chủ!');
+      toast.error('Không thể kết nối máy chủ!', 'Lỗi kết nối');
     } finally {
       setIsUploadingImage(false);
       if (e.target) e.target.value = '';

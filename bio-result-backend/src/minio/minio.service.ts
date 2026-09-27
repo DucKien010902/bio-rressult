@@ -1,7 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import * as crypto from 'crypto';
-import * as http from 'http';
-import * as https from 'https';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import * as Minio from 'minio';
 
 export function removeVietnameseTones(str: string): string {
   if (!str) return 'ANONYMOUS';
@@ -33,185 +31,229 @@ export function generateMinioObjectKey(
 }
 
 @Injectable()
-export class MinioService {
+export class MinioService implements OnModuleInit {
   private readonly logger = new Logger(MinioService.name);
+  private client: Minio.Client;
+  private bucketName: string;
+  private publicUrl: string;
 
-  private readonly endPoint = process.env.MINIO_ENDPOINT || 'file.gennovax.vn';
-  private readonly port = parseInt(process.env.MINIO_PORT || '443', 10);
-  private readonly useSSL =
-    process.env.MINIO_USE_SSL === 'true' ||
-    (process.env.URL_MINIO ? process.env.URL_MINIO.startsWith('https') : true);
-  private readonly accessKey = process.env.MINIO_ACCESS_KEY || 'admin';
-  private readonly secretKey = process.env.MINIO_SECRET_KEY || 'admin2025';
-  private readonly bucketName = 'genhd';
-  private readonly baseUrl = process.env.URL_MINIO || 'https://file.gennovax.vn';
+  constructor() {
+    const endPoint = process.env.MINIO_ENDPOINT || 'file.gennovax.vn';
+    const port = Number(process.env.MINIO_PORT) || 443;
+    const useSSL = process.env.MINIO_USE_SSL === 'true' || port === 443;
+    const accessKey = process.env.MINIO_ACCESS_KEY || 'admin';
+    const secretKey = process.env.MINIO_SECRET_KEY || 'admin2025';
+
+    this.bucketName = process.env.MINIO_BUCKET || 'genhd';
+    this.publicUrl = (
+      process.env.MINIO_PUBLIC_URL ||
+      process.env.URL_MINIO ||
+      (useSSL ? `https://${endPoint}` : `http://${endPoint}:${port}`)
+    ).replace(/\/$/, '');
+
+    this.client = new Minio.Client({
+      endPoint,
+      port,
+      useSSL,
+      accessKey,
+      secretKey,
+    });
+  }
+
+  async onModuleInit() {
+    await this.initBucket();
+  }
+
+  /**
+   * Khởi tạo bucket và gán quyền Public Read nếu chưa có
+   */
+  async initBucket(): Promise<void> {
+    try {
+      const exists = await this.client.bucketExists(this.bucketName);
+      if (!exists) {
+        await this.client.makeBucket(this.bucketName);
+        this.logger.log(`Created new MinIO bucket: ${this.bucketName}`);
+      }
+
+      const publicReadPolicy = {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Principal: '*',
+            Action: ['s3:GetObject'],
+            Resource: [`arn:aws:s3:::${this.bucketName}/*`],
+          },
+        ],
+      };
+
+      await this.client.setBucketPolicy(
+        this.bucketName,
+        JSON.stringify(publicReadPolicy),
+      );
+      this.logger.log(`MinIO bucket '${this.bucketName}' is ready with Public Read policy.`);
+    } catch (err: any) {
+      this.logger.warn(`MinIO init warning: ${err?.message || err}`);
+    }
+  }
 
   /**
    * Tải file ảnh lên MinIO Bucket `genhd`
-   * Cấu trúc Key: {loaiXetNghiem}/{maSo}_{tenBenhNhanKhongDau}_{loaiAnh}.{ext}
+   * Trả về full URL để lưu vào CSDL
    */
   async uploadFile(
     buffer: Buffer,
     objectKey: string,
     mimeType: string = 'image/jpeg',
   ): Promise<string> {
-    const fullKey = `${this.bucketName}/${objectKey}`;
-    const publicUrl = `${this.baseUrl}/${fullKey}`;
-
-    try {
-      await this.sendS3Request('PUT', fullKey, buffer, {
+    const cleanObjectKey = objectKey.replace(/^\/+/, '');
+    await this.client.putObject(
+      this.bucketName,
+      cleanObjectKey,
+      buffer,
+      buffer.length,
+      {
         'Content-Type': mimeType,
-      });
-      this.logger.log(`[MinIO] Upload thành công: ${publicUrl}`);
-      return publicUrl;
-    } catch (err: any) {
-      this.logger.warn(`[MinIO Warning] Không thể đẩy file trực tiếp lên MinIO (${err.message}), sử dụng fallback URL`);
-      return publicUrl;
-    }
+      },
+    );
+
+    const publicUrl = `${this.publicUrl}/${this.bucketName}/${cleanObjectKey}`;
+    this.logger.log(`[MinIO] Upload thành công: ${publicUrl}`);
+    return publicUrl;
   }
 
   /**
    * Xóa file ảnh khỏi MinIO Bucket `genhd`
    */
-  async deleteFile(objectKey: string): Promise<boolean> {
-    if (!objectKey) return true;
+  async deleteFile(objectKeyOrUrl: string): Promise<boolean> {
+    if (!objectKeyOrUrl) return true;
 
-    let cleanKey = objectKey;
-    if (cleanKey.includes(this.baseUrl)) {
-      cleanKey = cleanKey.replace(`${this.baseUrl}/`, '');
+    let cleanKey = objectKeyOrUrl;
+    // Bỏ domain nếu là full URL
+    if (cleanKey.includes(this.publicUrl)) {
+      cleanKey = cleanKey.replace(this.publicUrl, '');
     }
-    if (!cleanKey.startsWith(`${this.bucketName}/`)) {
-      cleanKey = `${this.bucketName}/${cleanKey}`;
+    // Bỏ / ở đầu
+    cleanKey = cleanKey.replace(/^\/+/, '');
+    // Bỏ bucketName nếu có
+    if (cleanKey.startsWith(`${this.bucketName}/`)) {
+      cleanKey = cleanKey.substring(this.bucketName.length + 1);
     }
 
     try {
-      await this.sendS3Request('DELETE', cleanKey);
+      await this.client.removeObject(this.bucketName, cleanKey);
       this.logger.log(`[MinIO] Đã xóa file: ${cleanKey}`);
       return true;
     } catch (err: any) {
-      this.logger.warn(`[MinIO Warning] Lỗi xóa file MinIO: ${err.message}`);
+      this.logger.warn(`[MinIO Warning] Lỗi xóa file MinIO: ${err?.message || err}`);
       return false;
     }
   }
 
   /**
-   * Gửi HTTP/HTTPS Request chuẩn S3 AWS Signature V4 tới MinIO Server
+   * Đọc trực tiếp Buffer từ MinIO S3 qua objectKey
    */
-  private sendS3Request(
-    method: 'PUT' | 'DELETE' | 'GET',
-    resourcePath: string,
-    body?: Buffer,
-    extraHeaders: Record<string, string> = {},
-  ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const host = this.endPoint;
-      const path = resourcePath.startsWith('/') ? resourcePath : `/${resourcePath}`;
-      const region = 'us-east-1';
-      const service = 's3';
+  async getObjectBuffer(objectKey: string): Promise<Buffer | null> {
+    try {
+      let cleanKey = objectKey.replace(/^\/+/, '');
+      if (cleanKey.startsWith(`${this.bucketName}/`)) {
+        cleanKey = cleanKey.substring(this.bucketName.length + 1);
+      }
+      try {
+        cleanKey = decodeURIComponent(cleanKey);
+      } catch (e) {}
 
-      const now = new Date();
-      const amzDate = now.toISOString().replace(/[:-]/g, '').split('.')[0] + 'Z';
-      const dateStamp = amzDate.substring(0, 8);
+      const stream = await this.client.getObject(this.bucketName, cleanKey);
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      return Buffer.concat(chunks);
+    } catch (err: any) {
+      this.logger.warn(`[MinIO getObjectBuffer] Không thể đọc object '${objectKey}': ${err?.message || err}`);
+      return null;
+    }
+  }
 
-      const contentPayload = body || Buffer.alloc(0);
-      const payloadHash = crypto
-        .createHash('sha256')
-        .update(contentPayload)
-        .digest('hex');
+  /**
+   * Lấy Buffer ảnh thông minh hỗ trợ tất cả các nguồn:
+   * 1. Data URI / Base64 (data:image/...)
+   * 2. Raw Base64 string (/9j/..., iVBORw0KGgo...)
+   * 3. MinIO URL (https://file.gennovax.vn/genhd/...) - ưu tiên đọc thẳng qua MinIO S3 SDK
+   * 4. External HTTP/HTTPS URL - fallback tải qua fetch
+   * 5. Object Key tương đối
+   */
+  async getImageBuffer(source: string): Promise<Buffer | null> {
+    if (!source || typeof source !== 'string') return null;
 
-      const headers: Record<string, string> = {
-        host: host,
-        'x-amz-date': amzDate,
-        'x-amz-content-sha256': payloadHash,
-        ...extraHeaders,
-      };
+    const trimmed = source.trim();
+    if (!trimmed) return null;
 
-      if (body) {
-        headers['content-length'] = body.length.toString();
+    // 1. Data URI Base64 (data:image/jpeg;base64,...)
+    if (trimmed.startsWith('data:image')) {
+      try {
+        const commaIdx = trimmed.indexOf(',');
+        const base64Data = commaIdx !== -1 ? trimmed.substring(commaIdx + 1) : trimmed;
+        return Buffer.from(base64Data, 'base64');
+      } catch (err: any) {
+        this.logger.warn(`Lỗi decode base64 image: ${err?.message || err}`);
+        return null;
+      }
+    }
+
+    // 2. Raw Base64 không có tiền tố data:image
+    if (trimmed.startsWith('/9j/') || trimmed.startsWith('iVBORw0KGgo')) {
+      try {
+        return Buffer.from(trimmed, 'base64');
+      } catch (err: any) {
+        this.logger.warn(`Lỗi decode raw base64: ${err?.message || err}`);
+        return null;
+      }
+    }
+
+    // 3. MinIO URL hoặc HTTP/HTTPS URL
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      // 3.1 Thử đọc trực tiếp qua MinIO S3 SDK nếu URL trỏ vào domain MinIO hoặc bucket genhd
+      let cleanKey = trimmed;
+      if (cleanKey.includes(this.publicUrl)) {
+        cleanKey = cleanKey.replace(this.publicUrl, '');
+      }
+      cleanKey = cleanKey.replace(/^\/+/, '');
+      if (cleanKey.startsWith(`${this.bucketName}/`)) {
+        cleanKey = cleanKey.substring(this.bucketName.length + 1);
       }
 
-      // Canonical Request
-      const canonicalHeaders = Object.keys(headers)
-        .sort()
-        .map((key) => `${key.toLowerCase()}:${headers[key].trim()}\n`)
-        .join('');
-      const signedHeaders = Object.keys(headers)
-        .sort()
-        .map((key) => key.toLowerCase())
-        .join(';');
+      const isMinioHost =
+        trimmed.includes(this.publicUrl) ||
+        trimmed.includes(this.bucketName) ||
+        trimmed.includes('file.gennovax.vn');
 
-      const canonicalRequest = [
-        method,
-        path,
-        '',
-        canonicalHeaders,
-        signedHeaders,
-        payloadHash,
-      ].join('\n');
-
-      // String to Sign
-      const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-      const stringToSign = [
-        'AWS4-HMAC-SHA256',
-        amzDate,
-        credentialScope,
-        crypto.createHash('sha256').update(canonicalRequest).digest('hex'),
-      ].join('\n');
-
-      // Signature
-      const kDate = crypto
-        .createHmac('sha256', 'AWS4' + this.secretKey)
-        .update(dateStamp)
-        .digest();
-      const kRegion = crypto
-        .createHmac('sha256', kDate)
-        .update(region)
-        .digest();
-      const kService = crypto
-        .createHmac('sha256', kRegion)
-        .update(service)
-        .digest();
-      const kSigning = crypto
-        .createHmac('sha256', kService)
-        .update('aws4_request')
-        .digest();
-      const signature = crypto
-        .createHmac('sha256', kSigning)
-        .update(stringToSign)
-        .digest('hex');
-
-      headers['Authorization'] =
-        `AWS4-HMAC-SHA256 Credential=${this.accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-
-      const options = {
-        hostname: host,
-        port: this.port,
-        path: path,
-        method: method,
-        headers: headers,
-        timeout: 5000,
-      };
-
-      const requester = this.useSSL ? https : http;
-      const req = requester.request(options, (res) => {
-        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-          resolve();
-        } else {
-          let errData = '';
-          res.on('data', (chunk) => (errData += chunk));
-          res.on('end', () => {
-            reject(
-              new Error(
-                `MinIO HTTP ${res.statusCode}: ${res.statusMessage} - ${errData}`,
-              ),
-            );
-          });
+      if (isMinioHost && cleanKey) {
+        const buf = await this.getObjectBuffer(cleanKey);
+        if (buf && buf.length > 0) {
+          return buf;
         }
-      });
+      }
 
-      req.on('error', (err) => reject(err));
-      if (body) req.write(body);
-      req.end();
-    });
+      // 3.2 Tải qua fetch HTTP/HTTPS
+      try {
+        const res = await fetch(trimmed, {
+          headers: {
+            'User-Agent': 'BioResult-Backend/1.0',
+          },
+        });
+        if (res.ok) {
+          const ab = await res.arrayBuffer();
+          return Buffer.from(ab);
+        } else {
+          this.logger.warn(`[Fetch Image] HTTP ${res.status} khi tải ảnh: ${trimmed}`);
+        }
+      } catch (fetchErr: any) {
+        this.logger.warn(`[Fetch Image] Lỗi tải ảnh ${trimmed}: ${fetchErr?.message || fetchErr}`);
+      }
+    }
+
+    // 4. Object Key dạng tương đối (ví dụ: 'cell/xxx.jpg' hoặc 'genhd/cell/xxx.jpg')
+    return await this.getObjectBuffer(trimmed);
   }
 }

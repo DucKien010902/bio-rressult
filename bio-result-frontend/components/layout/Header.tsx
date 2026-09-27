@@ -11,6 +11,7 @@ import {
   LogOut,
   ExternalLink,
   CheckCircle2,
+  Settings,
 } from 'lucide-react';
 
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
@@ -46,8 +47,12 @@ export default function Header({
   const [unreadCount, setUnreadCount] = useState(0);
   const notiRef = useRef<HTMLDivElement>(null);
 
+  // Settings dropdown state
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+
   const isDoctor = currentUser?.role === 'doctor' || currentUser?.role === 'bacsy';
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -78,11 +83,14 @@ export default function Header({
     fetchNotifications();
   }, [currentUser]);
 
-  // Handle outside click for notification dropdown
+  // Handle outside click for notification & settings dropdowns
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (notiRef.current && !notiRef.current.contains(event.target as Node)) {
         setNotiOpen(false);
+      }
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setSettingsOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -223,6 +231,55 @@ export default function Header({
             </div>
           )}
         </div>
+
+        {/* 1.5 SETTINGS BUTTON WITH FLOATING DROPDOWN (CHỈ DÀNH CHO ADMIN) */}
+        {isAdmin && (
+          <div className="relative" ref={settingsRef}>
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              className={`p-2.5 rounded-full transition-colors cursor-pointer ${
+                settingsOpen
+                  ? 'text-[#0070f3] bg-blue-50'
+                  : 'text-slate-600 hover:text-[#0070f3] hover:bg-slate-100'
+              }`}
+              title="Cài đặt hệ thống"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+
+            {/* Floating Settings Dropdown (Không dùng icon trong danh mục theo yêu cầu) */}
+            {settingsOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-top-2">
+                <div className="px-4 py-2.5 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  Cài đặt hệ thống
+                </div>
+                <div className="py-1">
+                  <Link
+                    href="/settings"
+                    onClick={() => setSettingsOpen(false)}
+                    className="block px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#0070f3] transition-colors"
+                  >
+                    Thời gian trả kết quả
+                  </Link>
+                  <Link
+                    href="/settings?tab=doctors"
+                    onClick={() => setSettingsOpen(false)}
+                    className="block px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#0070f3] transition-colors"
+                  >
+                    Quản lý Bác sĩ
+                  </Link>
+                  <Link
+                    href="/settings?tab=sources"
+                    onClick={() => setSettingsOpen(false)}
+                    className="block px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#0070f3] transition-colors"
+                  >
+                    Quản lý Nguồn / Đơn vị
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 2. USER PROFILE PILL & LOGOUT BUTTON */}
         <div className="flex items-center gap-2 pl-3 border-l border-slate-200">

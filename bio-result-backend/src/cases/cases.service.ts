@@ -115,10 +115,15 @@ export class CasesService {
   }
 
   async update(id: string, data: Partial<BioCase>): Promise<BioCase> {
+    const cleanData = { ...data };
+    delete (cleanData as any)._id;
+    delete (cleanData as any).createdAt;
+    delete (cleanData as any).updatedAt;
+
     const updated = await this.caseModel.findByIdAndUpdate(
       id,
-      { $set: data },
-      { new: true },
+      { $set: cleanData },
+      { returnDocument: 'after' },
     );
     if (!updated) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm để cập nhật');
@@ -455,6 +460,8 @@ export class CasesService {
   async updateImageField(id: string, field: string, imageUrl: string): Promise<BioCase> {
     const allowedFields = [
       'anhTeBao',
+      'anhTeBao2',
+      'anhHpv',
       'anhGpb',
       'anhSoiTuoi',
       'anhKy',

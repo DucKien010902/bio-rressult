@@ -7,6 +7,8 @@ import { UsersModule } from './users/users.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CasesModule } from './cases/cases.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
+import { MinioModule } from './minio/minio.module.js';
+import { SettingsModule } from './settings/settings.module.js';
 import { HttpLoggerMiddleware } from './common/middleware/http-logger.middleware.js';
 
 @Module({
@@ -32,6 +34,8 @@ import { HttpLoggerMiddleware } from './common/middleware/http-logger.middleware
     AuthModule,
     CasesModule,
     NotificationsModule,
+    MinioModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

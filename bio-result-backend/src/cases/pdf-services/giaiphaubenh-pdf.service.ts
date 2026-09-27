@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PDFDocument, PDFFont, rgb } from 'pdf-lib';
 import { BasePdfService } from './base-pdf.service.js';
+import { MinioService } from '../../minio/minio.service.js';
 
 @Injectable()
 export class GiaiphaubenhPdfService extends BasePdfService {
+  constructor(private minioService: MinioService) {
+    super();
+  }
   /**
    * Xử lý vẽ kết quả Giải phẫu bệnh
    * Tọa độ chuẩn 100% khớp với mẫu trắng thật GenHD, không dùng nền trắng đè lên watermark
@@ -175,25 +179,16 @@ export class GiaiphaubenhPdfService extends BasePdfService {
 
     // --- 5. ẢNH TIÊU BẢN GIẢI PHẪU BỆNH (Góc dưới bên trái, nếu có) ---
     const imgData = caseItem.anhTeBao || caseItem.anhGpb;
-    if (imgData && typeof imgData === 'string' && imgData.startsWith('data:image')) {
+    if (imgData) {
       try {
-        const base64Data = imgData.split(',')[1];
-        if (base64Data) {
-          const imgBuffer = Buffer.from(base64Data, 'base64');
-          let embeddedImg: any;
-          if (imgData.includes('jpeg') || imgData.includes('jpg')) {
-            embeddedImg = await pdfDoc.embedJpg(imgBuffer);
-          } else {
-            embeddedImg = await pdfDoc.embedPng(imgBuffer);
-          }
-          if (embeddedImg) {
-            pg.drawImage(embeddedImg, {
-              x: 60,
-              y: 28,
-              width: 175,
-              height: 115,
-            });
-          }
+        const imgBuffer = await this.minioService.getImageBuffer(imgData);
+        if (imgBuffer) {
+          await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
+            x: 55,
+            y: 25,
+            width: 185,
+            height: 120,
+          });
         }
       } catch (e) {
         // ignore image error

@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import { toast } from '@/components/common/Toast';
 
 export interface CaseItem {
   _id: string;
@@ -47,6 +48,128 @@ export interface CaseItem {
 
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
 
+interface TurnaroundInfo {
+  timeStr: string;
+  subLabel: string;
+  isOverdue: boolean;
+  overdueHours: number;
+  isCompleted: boolean;
+  isUnaccepted: boolean;
+}
+
+function getCaseTurnaroundInfo(
+  item: CaseItem,
+  turnaroundMap: Record<string, number>
+): TurnaroundInfo {
+  // 1. Nếu đã trả kết quả
+  if (item.trangThai === 'da_tra_ket_qua') {
+    let completedDate = item.ngayTraKetQua || (item as any).updatedAt || item.createdAt;
+    let formatted = 'Đã trả kết quả';
+    if (completedDate) {
+      try {
+        const d = new Date(completedDate);
+        if (!isNaN(d.getTime())) {
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          const mo = String(d.getMonth() + 1).padStart(2, '0');
+          const yyyy = d.getFullYear();
+          formatted = `${hh}:${mm} ${dd}/${mo}/${yyyy}`;
+        } else {
+          formatted = completedDate;
+        }
+      } catch {
+        formatted = completedDate;
+      }
+    }
+
+    return {
+      timeStr: formatted,
+      subLabel: 'Đã trả kết quả',
+      isOverdue: false,
+      overdueHours: 0,
+      isCompleted: true,
+      isUnaccepted: false,
+    };
+  }
+
+  // 2. Nếu chưa nhận mẫu (trạng thái: nhap_thong_tin)
+  if (item.trangThai === 'nhap_thong_tin') {
+    return {
+      timeStr: 'Chưa nhận mẫu',
+      subLabel: 'Chờ tiếp nhận',
+      isOverdue: false,
+      overdueHours: 0,
+      isCompleted: false,
+      isUnaccepted: true,
+    };
+  }
+
+  // 3. Đang chạy kết quả (chay_ket_qua): Tính thời gian dự kiến và kiểm tra quá hạn
+  let startTime = new Date();
+  if (item.ngayNhanMau) {
+    const p = new Date(item.ngayNhanMau);
+    if (!isNaN(p.getTime())) startTime = p;
+  } else if (item.createdAt) {
+    const p = new Date(item.createdAt);
+    if (!isNaN(p.getTime())) startTime = p;
+  }
+
+  const hoursConfig =
+    turnaroundMap[item.loaiXetNghiem] ||
+    (item.loaiXetNghiem?.startsWith('hpv') || item.loaiXetNghiem?.startsWith('combo')
+      ? 48
+      : item.loaiXetNghiem === 'giaiphaubenh'
+      ? 72
+      : item.loaiXetNghiem === 'soituoi'
+      ? 4
+      : 24);
+
+  let deadlineDate: Date;
+  if (item.ngayDuKienTra) {
+    const p = new Date(item.ngayDuKienTra);
+    if (!isNaN(p.getTime())) {
+      deadlineDate = p;
+    } else {
+      deadlineDate = new Date(startTime.getTime() + hoursConfig * 3600 * 1000);
+    }
+  } else {
+    deadlineDate = new Date(startTime.getTime() + hoursConfig * 3600 * 1000);
+  }
+
+  const hh = String(deadlineDate.getHours()).padStart(2, '0');
+  const mm = String(deadlineDate.getMinutes()).padStart(2, '0');
+  const dd = String(deadlineDate.getDate()).padStart(2, '0');
+  const mo = String(deadlineDate.getMonth() + 1).padStart(2, '0');
+  const yyyy = deadlineDate.getFullYear();
+  const timeStr = `${hh}:${mm} ${dd}/${mo}/${yyyy}`;
+
+  const diffMs = Date.now() - deadlineDate.getTime();
+  if (diffMs > 0) {
+    // Quá hạn
+    const overdueHours = Math.max(1, Math.floor(diffMs / (3600 * 1000)));
+    return {
+      timeStr,
+      subLabel: `Quá hạn ${overdueHours}h!`,
+      isOverdue: true,
+      overdueHours,
+      isCompleted: false,
+      isUnaccepted: false,
+    };
+  } else {
+    // Còn trong hạn
+    const remainingHours = Math.max(1, Math.ceil(-diffMs / (3600 * 1000)));
+    return {
+      timeStr,
+      subLabel: remainingHours > 24 ? `Còn ${(remainingHours / 24).toFixed(0)} ngày` : `Còn ${remainingHours}h`,
+      isOverdue: false,
+      overdueHours: 0,
+      isCompleted: false,
+      isUnaccepted: false,
+    };
+  }
+}
+
 interface CaseTableProps {
   cases: CaseItem[];
   loading: boolean;
@@ -63,6 +186,51 @@ export default function CaseTable({
   filterDoctorInitial = '',
 }: CaseTableProps) {
   const router = useRouter();
+
+  // Turnaround times map (SLA/Deadline)
+  const [turnaroundMap, setTurnaroundMap] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('bio_turnaround_times');
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch {}
+      }
+    }
+    return {
+      cell: 24,
+      thinprep: 24,
+      hpv40: 48,
+      hpv20: 48,
+      hpv23: 48,
+      soituoi: 4,
+      giaiphaubenh: 72,
+      combo_hpv20_cell: 48,
+      combo_hpv40_cell: 48,
+      combo_hpv23_cell: 48,
+      combo_hpv20_thinprep: 48,
+      combo_hpv40_thinprep: 48,
+      combo_hpv23_thinprep: 48,
+    };
+  });
+
+  useEffect(() => {
+    const fetchSla = async () => {
+      try {
+        const res = await fetch(getApiUrl('/settings/turnaround-time'), {
+          headers: getAuthHeaders(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setTurnaroundMap(data);
+          localStorage.setItem('bio_turnaround_times', JSON.stringify(data));
+        }
+      } catch (e) {
+        console.error('Error fetching SLA settings:', e);
+      }
+    };
+    fetchSla();
+  }, []);
 
   // Filters
   const [activeStatusTab, setActiveStatusTab] = useState<
@@ -95,6 +263,7 @@ export default function CaseTable({
       });
       if (res.ok) {
         setShowAcceptModal(false);
+        toast.success('Đã tiếp nhận ca xét nghiệm thành công!', 'Tiếp nhận thành công');
         if (goToDetail) {
           router.push(`/results/${selectedCaseForAccept._id}`);
         } else {
@@ -102,11 +271,11 @@ export default function CaseTable({
         }
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(err.message || 'Không thể tiếp nhận ca xét nghiệm!');
+        toast.error(err.message || 'Không thể tiếp nhận ca xét nghiệm!', 'Tiếp nhận thất bại');
       }
     } catch (err) {
       console.error('Error accepting case:', err);
-      alert('Không thể kết nối đến máy chủ!');
+      toast.error('Không thể kết nối đến máy chủ!', 'Lỗi kết nối');
     } finally {
       setIsAccepting(false);
     }
@@ -227,10 +396,15 @@ export default function CaseTable({
           headers: getAuthHeaders(),
         });
         if (res.ok) {
+          toast.success(`Đã xóa phiếu ${maSo} thành công!`, 'Xóa thành công');
           onRefresh();
+        } else {
+          const err = await res.json().catch(() => ({}));
+          toast.error(err.message || 'Không thể xóa phiếu xét nghiệm!', 'Xóa thất bại');
         }
       } catch (err) {
         console.error('Error deleting case:', err);
+        toast.error('Không thể kết nối đến máy chủ!', 'Lỗi kết nối');
       }
     }
   };
@@ -428,14 +602,31 @@ export default function CaseTable({
                     ? new Date(item.createdAt).toLocaleDateString('vi-VN')
                     : item.ngayNhanMau || '';
 
+                  // Tính toán thời gian trả / dự kiến & trạng thái quá hạn
+                  const turnaround = getCaseTurnaroundInfo(item, turnaroundMap);
+
+                  // Màu dòng và viền cạnh trái theo trạng thái
+                  let rowBgClass = 'bg-white hover:bg-sky-50/40';
+                  let firstCellBorder = '';
+
+                  if (turnaround.isOverdue) {
+                    rowBgClass = 'bg-rose-50/70 hover:bg-rose-100/70';
+                    firstCellBorder = 'border-l-4 border-l-red-500';
+                  } else if (turnaround.isUnaccepted) {
+                    rowBgClass = 'bg-amber-50/60 hover:bg-amber-100/60';
+                    firstCellBorder = 'border-l-4 border-l-amber-400';
+                  } else if (turnaround.isCompleted) {
+                    rowBgClass = 'bg-white hover:bg-slate-50/80';
+                  }
+
                   return (
                     <tr
                       key={item._id}
                       onClick={() => router.push(`/results/${item._id}`)}
-                      className="hover:bg-sky-50/40 transition-colors cursor-pointer group"
+                      className={`${rowBgClass} transition-colors cursor-pointer group`}
                     >
                       {/* Mã số */}
-                      <td className="py-3.5 px-4 font-bold text-[#0070f3] hover:underline">
+                      <td className={`py-3.5 px-4 font-bold text-[#0070f3] hover:underline relative ${firstCellBorder}`}>
                         <span>{item.maSo}</span>
                       </td>
 
@@ -494,23 +685,44 @@ export default function CaseTable({
 
                       {/* Thời gian trả / Dự kiến */}
                       <td className="py-3.5 px-4 text-xs font-medium">
-                        {item.trangThai === 'da_tra_ket_qua' ? (
+                        {turnaround.isCompleted ? (
                           <div>
                             <div className="font-bold text-slate-800">
-                              {item.ngayTraKetQua || '12/09/2026'}
+                              {turnaround.timeStr}
                             </div>
-                            <div className="text-[10px] font-semibold text-emerald-600 flex items-center gap-1 mt-0.5">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span>Đã trả kết quả</span>
+                            <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>{turnaround.subLabel}</span>
+                            </div>
+                          </div>
+                        ) : turnaround.isUnaccepted ? (
+                          <div>
+                            <div className="font-semibold text-slate-500">
+                              {turnaround.timeStr}
+                            </div>
+                            <div className="text-[11px] font-bold text-amber-600 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3.5 h-3.5 text-amber-500" />
+                              <span>{turnaround.subLabel}</span>
+                            </div>
+                          </div>
+                        ) : turnaround.isOverdue ? (
+                          <div>
+                            <div className="font-bold text-slate-800">
+                              {turnaround.timeStr}
+                            </div>
+                            <div className="text-[11px] font-bold text-red-600 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3.5 h-3.5 text-red-500" />
+                              <span>{turnaround.subLabel}</span>
                             </div>
                           </div>
                         ) : (
                           <div>
-                            <div className="text-slate-600">
-                              {item.ngayDuKienTra || 'Dự kiến: 2-3 ngày'}
+                            <div className="font-bold text-slate-800">
+                              {turnaround.timeStr}
                             </div>
-                            <div className="text-[10px] text-amber-600 font-medium mt-0.5">
-                              Đang xử lý mẫu
+                            <div className="text-[11px] font-semibold text-blue-600 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3.5 h-3.5 text-blue-500" />
+                              <span>{turnaround.subLabel}</span>
                             </div>
                           </div>
                         )}

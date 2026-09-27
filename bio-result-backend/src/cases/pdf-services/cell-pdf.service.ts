@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PDFDocument, PDFFont, rgb } from 'pdf-lib';
 import { BasePdfService } from './base-pdf.service.js';
+import { MinioService } from '../../minio/minio.service.js';
 
 @Injectable()
 export class CellPdfService extends BasePdfService {
+  constructor(private minioService: MinioService) {
+    super();
+  }
   /**
    * Xử lý vẽ kết quả Tế bào học Cổ tử cung (Cell & ThinPrep)
    * Tọa độ bóc tách & căn chỉnh chuẩn 100% khớp với mẫu trắng thật GenHD
@@ -50,7 +54,7 @@ export class CellPdfService extends BasePdfService {
       }
     };
 
-    // Helper căn giữa chữ trong khoảng [minX, maxX]
+    // Helper căn giữa chữ trong khoảng [minX, maxX] với cơ chế tự co cỡ chữ nếu dài
     const drawCentered = (
       text: string,
       minX: number,
@@ -61,9 +65,15 @@ export class CellPdfService extends BasePdfService {
       if (!text) return;
       const { bold = false, size = 9, color = textColor } = opts;
       const font = bold ? fontB : fontR;
-      const textWidth = font.widthOfTextAtSize(String(text), size);
+      let finalSize = size;
+      const maxAllowedWidth = (maxX - minX) - 4;
+      let textWidth = font.widthOfTextAtSize(String(text), finalSize);
+      if (textWidth > maxAllowedWidth && textWidth > 0) {
+        finalSize = Math.max(5.5, finalSize * (maxAllowedWidth / textWidth));
+        textWidth = font.widthOfTextAtSize(String(text), finalSize);
+      }
       const x = minX + (maxX - minX - textWidth) / 2;
-      pg.drawText(String(text), { x, y, size, font, color });
+      pg.drawText(String(text), { x, y, size: finalSize, font, color });
     };
 
     // Helper đánh dấu X chuẩn xác vào giữa ô vuông checkbox <0000>
@@ -89,19 +99,21 @@ export class CellPdfService extends BasePdfService {
       if (!val) return false;
       if (typeof val === 'boolean') return val;
       if (Array.isArray(val)) {
-        return val.some(
-          (v: string) =>
-            v === key ||
-            (label && v === label) ||
-            keywords.some((k) =>
-              String(v).toLowerCase().includes(k.toLowerCase()),
-            ),
-        );
+        return val.some((v: any) => {
+          if (!v) return false;
+          const s = String(v).trim().toLowerCase();
+          if (s === key.toLowerCase()) return true;
+          if (label && (s === label.toLowerCase() || s.includes(label.toLowerCase()))) return true;
+          return keywords.some((k) => s === k.toLowerCase() || s.includes(k.toLowerCase()));
+        });
       }
       if (typeof val === 'string') {
-        const lower = val.toLowerCase();
-        if (lower.includes(key.toLowerCase())) return true;
+        const lower = val.toLowerCase().trim();
+        if (lower === key.toLowerCase()) return true;
         if (label && lower.includes(label.toLowerCase())) return true;
+        const parts = lower.split(',').map((p) => p.trim());
+        if (parts.includes(key.toLowerCase())) return true;
+        if (label && parts.includes(label.toLowerCase())) return true;
         return keywords.some((k) => lower.includes(k.toLowerCase()));
       }
       return false;
@@ -268,8 +280,8 @@ export class CellPdfService extends BasePdfService {
         'batThuongVay',
         'lsil',
         'Tổn thương trong biểu mô vảy grade thấp (LSIL)',
-      ) &&
-        !hasItem('batThuongVay', 'lsilHpv', '', ['+ hpv', '+hpv', 'lsilhpv']),
+        ['lsil'],
+      ),
     );
     drawCheck(
       41.5,
@@ -306,10 +318,12 @@ export class CellPdfService extends BasePdfService {
     drawCheck(
       290.3,
       346.2,
-      hasItem('batThuongTuyen', 'agc', 'Tế bào tuyến không điển hình (AGC)') &&
-        !hasItem('batThuongTuyen', 'agcKdh', '', ['không đặc hiệu']) &&
-        !hasItem('batThuongTuyen', 'agcKCtc', '', ['ctc']) &&
-        !hasItem('batThuongTuyen', 'agcKTuyen', '', ['hướng về k tuyến']),
+      hasItem(
+        'batThuongTuyen',
+        'agc',
+        'Tế bào tuyến không điển hình (AGC)',
+        ['tế bào tuyến không điển hình'],
+      ),
     );
     drawCheck(
       290.3,
@@ -415,44 +429,29 @@ export class CellPdfService extends BasePdfService {
     if (drName && drName !== 'BS CK1 PHẠM THẾ HÙNG' && drName !== 'Chưa phân loại') {
       pg.drawRectangle({
         x: 340,
-        y: 58,
+        y: 63.5,
         width: 200,
-        height: 16,
+        height: 13,
         color: rgb(1, 1, 1),
       });
       drawCentered(drName, 340, 540, 66.0, { bold: true, size: 9.5 });
     }
 
-    // --- 9. Ảnh tế bào (nếu có) ---
-    if (
-      caseItem.anhTeBao &&
-      typeof caseItem.anhTeBao === 'string' &&
-      caseItem.anhTeBao.startsWith('data:image')
-    ) {
+    // --- 9. Ảnh tiêu bản tế bào (nếu có) ---
+    const cellImgSrc = caseItem.anhTeBao || caseItem.anhTieuBan;
+    if (cellImgSrc) {
       try {
-        const base64Data = caseItem.anhTeBao.split(',')[1];
-        if (base64Data) {
-          const imgBuffer = Buffer.from(base64Data, 'base64');
-          let embeddedImg: any;
-          if (
-            caseItem.anhTeBao.includes('jpeg') ||
-            caseItem.anhTeBao.includes('jpg')
-          ) {
-            embeddedImg = await pdfDoc.embedJpg(imgBuffer);
-          } else {
-            embeddedImg = await pdfDoc.embedPng(imgBuffer);
-          }
-          if (embeddedImg) {
-            pg.drawImage(embeddedImg, {
-              x: 60,
-              y: 60,
-              width: 220,
-              height: 100,
-            });
-          }
+        const imgBuffer = await this.minioService.getImageBuffer(cellImgSrc);
+        if (imgBuffer) {
+          await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
+            x: 55,
+            y: 45,
+            width: 235,
+            height: 135,
+          });
         }
       } catch (e) {
-        // ignore image error
+        // bỏ qua nếu lỗi tải ảnh
       }
     }
   }
@@ -655,6 +654,22 @@ export class CellPdfService extends BasePdfService {
       const signW = fontB.widthOfTextAtSize(signText, 7.5);
       const signX = 400 + (550 - 400 - signW) / 2;
       drawText(signX, 130, signText, { bold: true, size: 7.5, color: rgb(0.1, 0.6, 0.3) });
+    }
+
+    // 6. Ảnh tiêu bản tế bào (nếu có)
+    const cellImgSrc = caseItem.anhTeBao || caseItem.anhTieuBan;
+    if (cellImgSrc) {
+      try {
+        const imgBuffer = await this.minioService.getImageBuffer(cellImgSrc);
+        if (imgBuffer) {
+          await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
+            x: 55,
+            y: 50,
+            width: 230,
+            height: 130,
+          });
+        }
+      } catch (e) {}
     }
   }
 }

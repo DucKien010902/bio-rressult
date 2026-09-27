@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PDFDocument, PDFFont, rgb } from 'pdf-lib';
 import { BasePdfService } from './base-pdf.service.js';
+import { MinioService } from '../../minio/minio.service.js';
 
 @Injectable()
 export class SoituoiPdfService extends BasePdfService {
+  constructor(private minioService: MinioService) {
+    super();
+  }
   /**
    * Xử lý vẽ kết quả Soi tươi dịch âm đạo (5 chỉ số chuẩn pixel-perfect)
    */
@@ -234,25 +238,16 @@ export class SoituoiPdfService extends BasePdfService {
 
     // Chữ ký điện tử / Ảnh chữ ký (nếu có)
     const sigData = caseItem.chuKy || caseItem.signatureImage;
-    if (sigData && typeof sigData === 'string' && sigData.startsWith('data:image')) {
+    if (sigData) {
       try {
-        const base64Data = sigData.split(',')[1];
-        if (base64Data) {
-          const imgBuffer = Buffer.from(base64Data, 'base64');
-          let embeddedImg: any;
-          if (sigData.includes('jpeg') || sigData.includes('jpg')) {
-            embeddedImg = await pdfDoc.embedJpg(imgBuffer);
-          } else {
-            embeddedImg = await pdfDoc.embedPng(imgBuffer);
-          }
-          if (embeddedImg) {
-            pg.drawImage(embeddedImg, {
-              x: 380,
-              y: 95,
-              width: 110,
-              height: 55,
-            });
-          }
+        const imgBuffer = await this.minioService.getImageBuffer(sigData);
+        if (imgBuffer) {
+          await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
+            x: 380,
+            y: 95,
+            width: 110,
+            height: 55,
+          });
         }
       } catch (e) {
         // bỏ qua nếu ảnh lỗi

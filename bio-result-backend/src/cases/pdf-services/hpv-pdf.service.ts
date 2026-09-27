@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PDFDocument, PDFFont, rgb } from 'pdf-lib';
 import { BasePdfService } from './base-pdf.service.js';
+import { MinioService } from '../../minio/minio.service.js';
 
 @Injectable()
 export class HpvPdfService extends BasePdfService {
+  constructor(private minioService: MinioService) {
+    super();
+  }
   /**
    * Xử lý vẽ kết quả HPV (HPV 40, HPV 20, HPV 23)
    */
@@ -40,13 +44,18 @@ export class HpvPdfService extends BasePdfService {
         pg.drawText(String(text), { x, y, size, font, color });
       };
 
-      // Helper to center text in a column [minX, maxX]
+      // Helper to center text in a column [minX, maxX] with auto-shrink
       const drawCentered = (text: string, minX: number, maxX: number, y: number, opt: any = {}) => {
         if (!text) return;
         const font = opt.bold ? fontB : fontR;
-        const size = opt.size || 9.5;
+        let size = opt.size || 9.5;
         const color = opt.color || textColor;
-        const width = font.widthOfTextAtSize(String(text), size);
+        const maxAllowedWidth = (maxX - minX) - 4; // chừa lề 2pt mỗi bên để chữ không bao giờ chạm viền cột
+        let width = font.widthOfTextAtSize(String(text), size);
+        if (width > maxAllowedWidth && width > 0) {
+          size = Math.max(5.5, size * (maxAllowedWidth / width));
+          width = font.widthOfTextAtSize(String(text), size);
+        }
         const x = minX + (maxX - minX - width) / 2;
         pg.drawText(String(text), { x, y, size, font, color });
       };
@@ -137,9 +146,9 @@ export class HpvPdfService extends BasePdfService {
       if (caseItem.bacSiDoc && caseItem.bacSiDoc !== 'BS CK1 PHẠM THẾ HÙNG') {
         pg.drawRectangle({
           x: 340,
-          y: 118,
+          y: 122.5,
           width: 210,
-          height: 16,
+          height: 13,
           color: rgb(1, 1, 1),
         });
         drawCentered(caseItem.bacSiDoc, 340, 550, 124.8, { bold: true, size: 9.5 });
@@ -161,13 +170,18 @@ export class HpvPdfService extends BasePdfService {
         pg.drawText(String(text), { x, y, size, font, color });
       };
 
-      // Helper to center text in a column [minX, maxX]
+      // Helper to center text in a column [minX, maxX] with auto-shrink
       const drawCentered = (text: string, minX: number, maxX: number, y: number, opt: any = {}) => {
         if (!text) return;
         const font = opt.bold ? fontB : fontR;
-        const size = opt.size || 9.5;
+        let size = opt.size || 9.5;
         const color = opt.color || textColor;
-        const width = font.widthOfTextAtSize(String(text), size);
+        const maxAllowedWidth = (maxX - minX) - 4; // chừa lề 2pt mỗi bên để chữ không bao giờ chạm viền cột
+        let width = font.widthOfTextAtSize(String(text), size);
+        if (width > maxAllowedWidth && width > 0) {
+          size = Math.max(5.5, size * (maxAllowedWidth / width));
+          width = font.widthOfTextAtSize(String(text), size);
+        }
         const x = minX + (maxX - minX - width) / 2;
         pg.drawText(String(text), { x, y, size, font, color });
       };
@@ -266,9 +280,9 @@ export class HpvPdfService extends BasePdfService {
       if (caseItem.bacSiDoc && caseItem.bacSiDoc !== 'BS CK1 PHẠM THẾ HÙNG') {
         pg.drawRectangle({
           x: 340,
-          y: 86,
+          y: 91.0,
           width: 210,
-          height: 16,
+          height: 13,
           color: rgb(1, 1, 1),
         });
         drawCentered(caseItem.bacSiDoc, 340, 550, 93.6, { bold: true, size: 9.5 });
@@ -277,15 +291,8 @@ export class HpvPdfService extends BasePdfService {
       // 6. NẾU CÓ BIỂU ĐỒ REAL-TIME PCR
       if (caseItem.hienBieuDo && caseItem.anhHpv) {
         try {
-          const base64Data = caseItem.anhHpv.split(',')[1] || caseItem.anhHpv;
-          const imgBytes = Buffer.from(base64Data, 'base64');
-          let img;
-          if (caseItem.anhHpv.includes('image/png') || caseItem.anhHpv.startsWith('iVBORw')) {
-            img = await pdfDoc.embedPng(imgBytes);
-          } else {
-            img = await pdfDoc.embedJpg(imgBytes);
-          }
-          if (img) {
+          const imgBuffer = await this.minioService.getImageBuffer(caseItem.anhHpv);
+          if (imgBuffer) {
             pg.drawRectangle({
               x: 42,
               y: 248,
@@ -293,7 +300,7 @@ export class HpvPdfService extends BasePdfService {
               height: 82,
               color: rgb(1, 1, 1),
             });
-            pg.drawImage(img, {
+            await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
               x: 45,
               y: 249,
               width: 506,
@@ -321,13 +328,18 @@ export class HpvPdfService extends BasePdfService {
         pg.drawText(String(text), { x, y, size, font, color });
       };
 
-      // Helper to center text in a column [minX, maxX]
+      // Helper to center text in a column [minX, maxX] with auto-shrink
       const drawCentered = (text: string, minX: number, maxX: number, y: number, opt: any = {}) => {
         if (!text) return;
         const font = opt.bold ? fontB : fontR;
-        const size = opt.size || 9.5;
+        let size = opt.size || 9.5;
         const color = opt.color || textColor;
-        const width = font.widthOfTextAtSize(String(text), size);
+        const maxAllowedWidth = (maxX - minX) - 4; // chừa lề 2pt mỗi bên để chữ không bao giờ chạm viền cột
+        let width = font.widthOfTextAtSize(String(text), size);
+        if (width > maxAllowedWidth && width > 0) {
+          size = Math.max(5.5, size * (maxAllowedWidth / width));
+          width = font.widthOfTextAtSize(String(text), size);
+        }
         const x = minX + (maxX - minX - width) / 2;
         pg.drawText(String(text), { x, y, size, font, color });
       };
@@ -449,15 +461,8 @@ export class HpvPdfService extends BasePdfService {
       // 6. NẾU CÓ BIỂU ĐỒ REAL-TIME PCR
       if (caseItem.hienBieuDo && caseItem.anhHpv) {
         try {
-          const base64Data = caseItem.anhHpv.split(',')[1] || caseItem.anhHpv;
-          const imgBytes = Buffer.from(base64Data, 'base64');
-          let img;
-          if (caseItem.anhHpv.includes('image/png') || caseItem.anhHpv.startsWith('iVBORw')) {
-            img = await pdfDoc.embedPng(imgBytes);
-          } else {
-            img = await pdfDoc.embedJpg(imgBytes);
-          }
-          if (img) {
+          const imgBuffer = await this.minioService.getImageBuffer(caseItem.anhHpv);
+          if (imgBuffer) {
             pg.drawRectangle({
               x: 45,
               y: 268,
@@ -465,7 +470,7 @@ export class HpvPdfService extends BasePdfService {
               height: 72,
               color: rgb(1, 1, 1),
             });
-            pg.drawImage(img, {
+            await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
               x: 48,
               y: 270,
               width: 500,

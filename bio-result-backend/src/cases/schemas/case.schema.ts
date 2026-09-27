@@ -118,23 +118,26 @@ export class BioCase extends Document {
   @Prop({ default: '' })
   nhanXetDaiThe!: string;
 
-  @Prop({ default: '' })
-  khongTonThuong!: string; // Không tổn thương trong biểu mô hay ác tính (NILM)
+  @Prop({ type: Object, default: false })
+  khongTonThuong!: any; // Không tổn thương trong biểu mô hay ác tính (NILM)
 
-  @Prop({ default: '' })
-  bienDoiViSinh!: string; // Biến đổi do vi sinh (nấm, trùng roi, tạp khuẩn...)
+  @Prop({ type: Object, default: false })
+  batThuongKhac!: any;
 
-  @Prop({ default: '' })
-  bienDoiKhac!: string; // Biến đổi tế bào phản ứng khác
+  @Prop({ type: Object, default: false })
+  teBaoNoiMac!: any;
 
-  @Prop({ default: '' })
-  batThuongVay!: string; // Tế bào biểu mô vảy (ASC-US, ASC-H, LSIL, HSIL, SCC)
+  @Prop({ type: Object, default: [] })
+  bienDoiViSinh!: any; // Biến đổi do vi sinh (nấm, trùng roi, tạp khuẩn...)
 
-  @Prop({ default: '' })
-  batThuongTuyen!: string; // Tế bào biểu mô tuyến (AGC, AIS, Adenocarcinoma)
+  @Prop({ type: Object, default: [] })
+  bienDoiKhac!: any; // Biến đổi tế bào phản ứng khác
 
-  @Prop({ default: '' })
-  batThuongKhac!: string;
+  @Prop({ type: Object, default: [] })
+  batThuongVay!: any; // Tế bào biểu mô vảy (ASC-US, ASC-H, LSIL, HSIL, SCC)
+
+  @Prop({ type: Object, default: [] })
+  batThuongTuyen!: any; // Tế bào biểu mô tuyến (AGC, AIS, Adenocarcinoma)
 
   // --- Ảnh tiêu bản tế bào học / Giải phẫu bệnh ---
   @Prop({ default: '' })

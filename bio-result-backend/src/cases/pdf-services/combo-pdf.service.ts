@@ -94,6 +94,7 @@ export class ComboPdfService extends BasePdfService {
     // 5. Trang 2 (index = 1): Đổ kết quả Cell / ThinPrep pixel-perfect
     const cellCaseItem = {
       ...caseItem,
+      anhTeBao: caseItem.anhTeBao2 || caseItem.anhTeBao,
       ketLuan:
         caseItem.ketLuan2 ||
         caseItem.ketLuan ||

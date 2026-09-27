@@ -120,4 +120,72 @@ export class BasePdfService {
       oy: -3,
     });
   }
+
+  /**
+   * Nhúng và vẽ ảnh vào bounding box theo đúng tỷ lệ gốc (không bóp méo, co dãn), căn giữa ô
+   * @param pdfDoc Đối tượng PDFDocument
+   * @param pg Trang PDF cần vẽ
+   * @param imgBuffer Buffer dữ liệu ảnh (JPG / PNG)
+   * @param box Bounding box { x, y, width, height }
+   */
+  async drawFittedImage(
+    pdfDoc: any,
+    pg: any,
+    imgBuffer: Buffer,
+    box: { x: number; y: number; width: number; height: number },
+  ): Promise<boolean> {
+    if (!imgBuffer || imgBuffer.length === 0) return false;
+
+    let embeddedImg: any;
+    // Kiểm tra định dạng ảnh qua magic bytes
+    const isPng =
+      imgBuffer.length > 4 &&
+      imgBuffer[0] === 0x89 &&
+      imgBuffer[1] === 0x50 &&
+      imgBuffer[2] === 0x4e &&
+      imgBuffer[3] === 0x47;
+
+    try {
+      if (isPng) {
+        embeddedImg = await pdfDoc.embedPng(imgBuffer);
+      } else {
+        embeddedImg = await pdfDoc.embedJpg(imgBuffer);
+      }
+    } catch (e1) {
+      // Thử định dạng ngược lại nếu header/đuôi file bị nhầm lẫn
+      try {
+        if (isPng) {
+          embeddedImg = await pdfDoc.embedJpg(imgBuffer);
+        } else {
+          embeddedImg = await pdfDoc.embedPng(imgBuffer);
+        }
+      } catch (e2) {
+        return false;
+      }
+    }
+
+    if (!embeddedImg) return false;
+
+    const imgW = embeddedImg.width;
+    const imgH = embeddedImg.height;
+    if (!imgW || !imgH) return false;
+
+    // Giữ nguyên 100% tỷ lệ ảnh gốc (không bóp méo)
+    const scale = Math.min(box.width / imgW, box.height / imgH);
+    const drawW = imgW * scale;
+    const drawH = imgH * scale;
+
+    // Căn giữa trong bounding box
+    const drawX = box.x + (box.width - drawW) / 2;
+    const drawY = box.y + (box.height - drawH) / 2;
+
+    pg.drawImage(embeddedImg, {
+      x: drawX,
+      y: drawY,
+      width: drawW,
+      height: drawH,
+    });
+
+    return true;
+  }
 }

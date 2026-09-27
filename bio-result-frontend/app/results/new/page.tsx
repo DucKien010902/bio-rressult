@@ -7,6 +7,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import LogoutConfirmModal from '@/components/layout/LogoutConfirmModal';
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
+import { toast } from '@/components/common/Toast';
 import {
   ArrowLeft,
   Check,
@@ -98,6 +99,12 @@ function NewCaseContent() {
     } else {
       try {
         const u = JSON.parse(userStr);
+        // Bác sĩ không được tạo mẫu, chỉ có admin và tài khoản nguồn (lab) mới được tạo
+        if (u.role === 'doctor' || u.role === 'bacsy') {
+          toast.warning('Tài khoản Bác sĩ không có quyền tạo phiếu xét nghiệm!', 'Từ chối quyền');
+          router.push('/');
+          return;
+        }
         setCurrentUser(u);
         if (u.role === 'lab' && u.donVi) {
           setFormData((prev) => ({ ...prev, donVi: u.donVi }));
@@ -173,12 +180,12 @@ function NewCaseContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.hoTen.trim()) {
-      alert('Vui lòng nhập họ và tên bệnh nhân!');
+      toast.warning('Vui lòng nhập họ và tên bệnh nhân!', 'Thiếu thông tin');
       return;
     }
 
     if (isAdmin && selectedSourceOption === 'custom' && !customSourceName.trim()) {
-      alert('Vui lòng nhập tên nguồn / đơn vị đối tác mới!');
+      toast.warning('Vui lòng nhập tên nguồn / đơn vị đối tác mới!', 'Thiếu thông tin');
       return;
     }
 
@@ -232,15 +239,16 @@ function NewCaseContent() {
 
       if (res.ok) {
         const created = await res.json();
+        toast.success('Tạo phiếu xét nghiệm mới thành công!', 'Tạo thành công');
         // Chuyển hướng ngay đến trang chi tiết ca vừa tạo để nhập kết quả / xuất PDF
         router.push(`/results/${created._id}`);
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(err.message || 'Có lỗi khi tạo phiếu xét nghiệm!');
+        toast.error(err.message || 'Có lỗi khi tạo phiếu xét nghiệm!', 'Tạo phiếu thất bại');
       }
     } catch (err) {
       console.error('Lỗi tạo ca mới:', err);
-      alert('Không thể kết nối đến máy chủ!');
+      toast.error('Không thể kết nối đến máy chủ!', 'Lỗi kết nối');
     } finally {
       setIsSubmitting(false);
     }

@@ -22,9 +22,12 @@ import {
   FlaskConical,
   ArrowLeft,
   ShieldAlert,
+  Pencil,
 } from 'lucide-react';
 
 import LogoutConfirmModal from '@/components/layout/LogoutConfirmModal';
+import UnsavedChangesModal from '@/components/cases/UnsavedChangesModal';
+import { toast } from '@/components/common/Toast';
 
 export default function CaseDetailPage() {
   const params = useParams();
@@ -41,6 +44,11 @@ export default function CaseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
+
+  // Unsaved changes tracking states
+  const [isDirty, setIsDirty] = useState(false);
+  const [showUnsavedModal, setShowUnsavedModal] = useState(false);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
 
   // Check auth & clean old cached GenHD usernames
   useEffect(() => {
@@ -73,9 +81,13 @@ export default function CaseDetailPage() {
       if (res.ok) {
         const data = await res.json();
         setCaseData(data);
+        setIsDirty(false);
       } else {
         const errJson = await res.json().catch(() => ({}));
-        alert(errJson.message || 'Không tìm thấy ca xét nghiệm hoặc không có quyền truy cập!');
+        toast.error(
+          errJson.message || 'Không tìm thấy ca xét nghiệm hoặc không có quyền truy cập!',
+          'Lỗi tải ca'
+        );
         router.push('/');
       }
     } catch (err) {
@@ -97,6 +109,7 @@ export default function CaseDetailPage() {
 
   // Field change handler
   const handleFieldChange = (field: string, value: any) => {
+    setIsDirty(true);
     setCaseData((prev: any) => ({
       ...prev,
       [field]: value,
@@ -107,7 +120,7 @@ export default function CaseDetailPage() {
   const handleSaveChanges = async () => {
     if (!caseData || !id) return;
     if (currentUser?.role === 'lab') {
-      alert('Tài khoản đơn vị gửi mẫu không có quyền chỉnh sửa thông tin!');
+      toast.warning('Tài khoản đơn vị gửi mẫu không có quyền chỉnh sửa thông tin!', 'Từ chối quyền');
       return;
     }
     setIsSaving(true);
@@ -120,14 +133,15 @@ export default function CaseDetailPage() {
       if (res.ok) {
         const updated = await res.json();
         setCaseData(updated);
-        alert('Đã lưu thông tin phiếu xét nghiệm thành công!');
+        setIsDirty(false);
+        toast.success('Đã lưu thông tin phiếu xét nghiệm thành công!', 'Lưu thành công');
       } else {
         const errData = await res.json().catch(() => ({}));
-        alert(errData.message || 'Có lỗi khi lưu thông tin phiếu!');
+        toast.error(errData.message || 'Có lỗi khi lưu thông tin phiếu!', 'Lưu thất bại');
       }
     } catch (err) {
       console.error('Error saving case:', err);
-      alert('Không thể kết nối đến máy chủ!');
+      toast.error('Không thể kết nối đến máy chủ!', 'Lỗi kết nối');
     } finally {
       setIsSaving(false);
     }
@@ -137,7 +151,7 @@ export default function CaseDetailPage() {
   const handleToggleSign = async () => {
     if (!caseData || !id) return;
     if (currentUser?.role === 'lab') {
-      alert('Tài khoản đơn vị gửi mẫu không có quyền ký duyệt kết quả!');
+      toast.warning('Tài khoản đơn vị gửi mẫu không có quyền ký duyệt kết quả!', 'Từ chối quyền');
       return;
     }
     const newDaKy = !caseData.daKy;
@@ -155,18 +169,102 @@ export default function CaseDetailPage() {
       if (res.ok) {
         const updated = await res.json();
         setCaseData(updated);
-        alert(
+        setIsDirty(false);
+        toast.success(
           newDaKy
-            ? 'Đã ký duyệt kết quả thành công!'
-            : 'Đã hủy chữ ký kết quả!'
+            ? 'Đã ký duyệt kết quả xét nghiệm thành công!'
+            : 'Đã hủy chữ ký kết quả xét nghiệm!',
+          newDaKy ? 'Ký duyệt thành công' : 'Đã hủy chữ ký'
         );
       }
     } catch (err) {
       console.error('Error toggling sign:', err);
+      toast.error('Có lỗi xảy ra khi ký duyệt kết quả!', 'Lỗi thao tác');
     } finally {
       setIsSaving(false);
     }
   };
+
+  // Intercept navigation if there are unsaved changes
+  const handleNavigate = (url: string) => {
+    if (isDirty) {
+      setPendingUrl(url);
+      setShowUnsavedModal(true);
+    } else {
+      router.push(url);
+    }
+  };
+
+  const handleConfirmLeave = () => {
+    setIsDirty(false);
+    setShowUnsavedModal(false);
+    if (pendingUrl === '__BACK__') {
+      window.history.back();
+    } else if (pendingUrl) {
+      router.push(pendingUrl);
+    }
+  };
+
+  const handleStayOnPage = () => {
+    setShowUnsavedModal(false);
+    setPendingUrl(null);
+  };
+
+  // 1. Cảnh báo khi người dùng tắt tab, reload trang hoặc nhập URL khác
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
+
+  // 2. Chặn các liên kết thẻ <a> (như Logo, Tạo phiếu mới) khi có thay đổi chưa lưu
+  useEffect(() => {
+    const handleAnchorClick = (e: MouseEvent) => {
+      if (!isDirty) return;
+      const target = (e.target as HTMLElement).closest('a');
+      if (target) {
+        const href = target.getAttribute('href');
+        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleNavigate(href);
+        }
+      }
+    };
+
+    document.addEventListener('click', handleAnchorClick, true);
+    return () => {
+      document.removeEventListener('click', handleAnchorClick, true);
+    };
+  }, [isDirty]);
+
+  // 3. Chặn nút Back/Forward của trình duyệt khi có thay đổi chưa lưu
+  useEffect(() => {
+    if (!isDirty) return;
+
+    window.history.pushState(null, '', window.location.href);
+
+    const handlePopState = () => {
+      if (isDirty) {
+        window.history.pushState(null, '', window.location.href);
+        setPendingUrl('__BACK__');
+        setShowUnsavedModal(true);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isDirty]);
 
   // Download PDF helper
   const handleDownloadPdf = (templateId?: string) => {
@@ -188,7 +286,7 @@ export default function CaseDetailPage() {
         sidebarOpen={sidebarOpen}
         activeCategory={caseData?.loaiXetNghiem || 'hpv40'}
         onSelectCategory={(catId) => {
-          router.push(`/?category=${catId}`);
+          handleNavigate(`/?category=${catId}`);
         }}
         currentUser={currentUser}
         onLogout={() => setShowLogoutModal(true)}
@@ -218,7 +316,7 @@ export default function CaseDetailPage() {
               {/* Back to List Button */}
               <div>
                 <button
-                  onClick={() => router.push('/')}
+                  onClick={() => handleNavigate('/')}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-[#0070f3] transition-colors cursor-pointer"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -276,7 +374,11 @@ export default function CaseDetailPage() {
                     type="button"
                     onClick={handleSaveChanges}
                     disabled={isSaving}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-[#0070f3] hover:bg-[#005bb5] text-white rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer disabled:opacity-50 ${
+                      isDirty
+                        ? 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-500/25 ring-2 ring-red-400'
+                        : 'bg-[#0070f3] hover:bg-[#005bb5] text-white shadow-xs'
+                    }`}
                   >
                     {isSaving ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -373,6 +475,7 @@ export default function CaseDetailPage() {
                 currentTemplate={caseData?.pdfTemplate}
                 onDownload={handleDownloadPdf}
                 onTemplateChange={(tplId) => {
+                  setIsDirty(true);
                   setCaseData((prev: any) => ({ ...prev, pdfTemplate: tplId }));
                 }}
               />
@@ -386,6 +489,13 @@ export default function CaseDetailPage() {
           )}
         </main>
       </div>
+
+      {/* MODAL CẢNH BÁO THAY ĐỔI CHƯA LƯU */}
+      <UnsavedChangesModal
+        isOpen={showUnsavedModal}
+        onStay={handleStayOnPage}
+        onLeave={handleConfirmLeave}
+      />
 
       {/* MODAL XÁC NHẬN ĐĂNG XUẤT */}
       <LogoutConfirmModal

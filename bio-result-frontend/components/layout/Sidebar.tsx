@@ -15,6 +15,7 @@ import {
   Layers,
   Dna,
   LogOut,
+  Settings,
 } from 'lucide-react';
 
 export interface CategoryItem {
@@ -58,6 +59,11 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
 
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isLab = currentUser?.role === 'lab';
+  // Chỉ Admin và tài khoản là nguồn (lab) mới được tạo mẫu, bác sĩ không được tạo
+  const canCreate = isAdmin || isLab;
+
   const handleCategoryClick = (catId: string) => {
     if (onSelectCategory) {
       onSelectCategory(catId);
@@ -97,19 +103,21 @@ export default function Sidebar({
         )}
       </Link>
 
-      {/* Nút Tạo phiếu mới (GenHD Style chuẩn xác theo mẫu) */}
-      <div className="px-3 pt-3 pb-1.5 shrink-0">
-        <Link
-          href="/results/new"
-          className={`flex items-center justify-center gap-2.5 w-full py-2.5 bg-[#0070f3] hover:bg-[#005bb5] active:scale-[0.98] text-white font-extrabold text-[13.5px] rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer ${
-            pathname === '/results/new' ? 'ring-2 ring-offset-2 ring-[#0070f3]' : ''
-          } ${sidebarOpen ? 'px-3.5' : 'px-2'}`}
-          title="Tạo phiếu mới"
-        >
-          <PlusCircle className="w-4.5 h-4.5 shrink-0 stroke-[2.5]" />
-          {sidebarOpen && <span className="tracking-wide">Tạo phiếu mới</span>}
-        </Link>
-      </div>
+      {/* Nút Tạo phiếu mới (Chỉ hiển thị cho Admin và tài khoản Nguồn gửi mẫu) */}
+      {canCreate && (
+        <div className="px-3 pt-3 pb-1.5 shrink-0">
+          <Link
+            href="/results/new"
+            className={`flex items-center justify-center gap-2.5 w-full py-2.5 bg-[#0070f3] hover:bg-[#005bb5] active:scale-[0.98] text-white font-extrabold text-[13.5px] rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer ${
+              pathname === '/results/new' ? 'ring-2 ring-offset-2 ring-[#0070f3]' : ''
+            } ${sidebarOpen ? 'px-3.5' : 'px-2'}`}
+            title="Tạo phiếu mới"
+          >
+            <PlusCircle className="w-4.5 h-4.5 shrink-0 stroke-[2.5]" />
+            {sidebarOpen && <span className="tracking-wide">Tạo phiếu mới</span>}
+          </Link>
+        </div>
+      )}
 
       {/* Navigation Categories */}
       <div className="flex-1 overflow-y-auto py-2.5 px-2.5 space-y-1 custom-scrollbar">
@@ -146,6 +154,33 @@ export default function Sidebar({
             </button>
           );
         })}
+
+        {/* Settings Link (Chỉ hiển thị cho Admin) */}
+        {isAdmin && (
+          <Link
+            href="/settings"
+            title="Cài đặt hệ thống"
+            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13.5px] font-bold transition-all cursor-pointer relative mt-1 border-t border-slate-100 ${
+              pathname?.startsWith('/settings')
+                ? 'text-[#0070f3] bg-sky-50/90 font-black shadow-2xs'
+                : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100/80 font-bold'
+            }`}
+          >
+            {pathname?.startsWith('/settings') && (
+              <span className="absolute left-0 top-2 bottom-2 w-1.5 bg-[#0070f3] rounded-r-full" />
+            )}
+            <Settings
+              className={`w-[19px] h-[19px] shrink-0 transition-colors ${
+                pathname?.startsWith('/settings') ? 'text-[#0070f3]' : 'text-slate-600'
+              }`}
+            />
+            {sidebarOpen && (
+              <span className="truncate text-left leading-tight text-[13.5px]">
+                Cài đặt hệ thống
+              </span>
+            )}
+          </Link>
+        )}
       </div>
 
       {/* Bottom User Profile Pin */}

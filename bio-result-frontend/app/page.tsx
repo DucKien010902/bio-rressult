@@ -149,7 +149,8 @@ function DashboardContent() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {currentUser?.role !== 'doctor' && (
+                  {/* Chỉ có Admin và tài khoản là nguồn (lab) mới được tạo mẫu */}
+                  {(currentUser?.role === 'admin' || currentUser?.role === 'lab') && (
                     <button
                       onClick={() =>
                         router.push(
