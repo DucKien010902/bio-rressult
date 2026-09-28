@@ -1,13 +1,176 @@
 import { Injectable } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PDFDocument, PDFFont, rgb } from 'pdf-lib';
 import { BasePdfService } from './base-pdf.service.js';
 import { MinioService } from '../../minio/minio.service.js';
+import { UsersService } from '../../users/users.service.js';
 
 @Injectable()
 export class HpvPdfService extends BasePdfService {
-  constructor(private minioService: MinioService) {
+  constructor(
+    private minioService: MinioService,
+    private usersService: UsersService,
+  ) {
     super();
   }
+
+  private async renderDoctorSignatureBlock({
+    pdfDoc,
+    pg,
+    caseItem,
+    centerX,
+    yName,
+    yTitle,
+    ySigCenter,
+    maskBox,
+    fontR,
+    fontB,
+    textColor,
+  }: {
+    pdfDoc: PDFDocument;
+    pg: any;
+    caseItem: any;
+    centerX: number;
+    yName: number;
+    yTitle: number;
+    ySigCenter: number;
+    maskBox: { x: number; y: number; width: number; height: number };
+    fontR: PDFFont;
+    fontB: PDFFont;
+    textColor: any;
+  }) {
+    // 1. Che sạch toàn bộ chữ in sẵn cũ (tên & chú thích trên phôi)
+    pg.drawRectangle({
+      x: maskBox.x,
+      y: maskBox.y,
+      width: maskBox.width,
+      height: maskBox.height,
+      color: rgb(1, 1, 1),
+    });
+
+    const drawCentered = (text: string, minX: number, maxX: number, y: number, opt: any = {}) => {
+      if (!text) return;
+      const font = opt.bold ? fontB : fontR;
+      let size = opt.size || 9.5;
+      const color = opt.color || textColor;
+      const maxAllowedWidth = maxX - minX - 4;
+      let width = font.widthOfTextAtSize(String(text), size);
+      if (width > maxAllowedWidth && width > 0) {
+        size = Math.max(5.5, size * (maxAllowedWidth / width));
+        width = font.widthOfTextAtSize(String(text), size);
+      }
+      const x = minX + (maxX - minX - width) / 2;
+      pg.drawText(String(text), { x, y, size, font, color });
+    };
+
+    const drName = (caseItem.bacSiDoc || caseItem.nguoiThucHien || 'BS CK1 PHẠM THẾ HÙNG').trim();
+    let subTitle = (caseItem.chucDanhDoc || '').trim();
+    let signatureUrl = (caseItem.signatureUrl || caseItem.chuKy || '').trim();
+
+    if (this.usersService) {
+      try {
+        const docInfo = await this.usersService.getDoctorInfo(drName);
+        if (docInfo) {
+          if (!subTitle && docInfo.title) {
+            subTitle = docInfo.title;
+          }
+          if (!signatureUrl && docInfo.signatureUrl) {
+            signatureUrl = docInfo.signatureUrl;
+          }
+        }
+      } catch (e) {
+        console.error('[HpvPdfService] Lỗi khi lấy thông tin bác sĩ:', e);
+      }
+    }
+
+    if (!subTitle) {
+      subTitle = '(Chuyên khoa Xét nghiệm - Giải phẫu bệnh lý)';
+    }
+
+    // 2. Vẽ Tên bác sĩ căn giữa 100% tại trục centerX
+    drawCentered(drName, centerX - 105, centerX + 105, yName, {
+      bold: true,
+      size: 9.5,
+      color: textColor,
+    });
+
+    // 3. Vẽ Chú thích chuyên môn / đơn vị công tác căn giữa 100% tại trục centerX
+    drawCentered(subTitle, centerX - 105, centerX + 105, yTitle, {
+      size: 8.0,
+      color: rgb(0.35, 0.35, 0.35),
+    });
+
+    // 4. Nếu đã ký duyệt, vẽ chữ ký căn giữa tại trục centerX
+    const isSigned = !!(caseItem.daKy || caseItem.daKy1 || caseItem.trangThai === 'da_tra_ket_qua');
+    if (isSigned) {
+      let sigBuffer: Buffer | null = null;
+      if (signatureUrl) {
+        try {
+          sigBuffer = await this.minioService.getImageBuffer(signatureUrl);
+        } catch (e) {}
+      }
+
+      // Fallback file cục bộ nếu MinIO chưa có
+      if (!sigBuffer) {
+        const slug = drName.toLowerCase();
+        let fallbackName = '';
+        if (slug.includes('lánh') || slug.includes('lanh')) fallbackName = 'bacsi_lanh.png';
+        else if (slug.includes('hùng') || slug.includes('hung')) fallbackName = 'bacsi_hung.png';
+        else if (slug.includes('sơn') || slug.includes('son')) fallbackName = 'bacsi_son.png';
+        else if (slug.includes('dương') || slug.includes('duong')) fallbackName = 'bacsi_duong.png';
+        else if (slug.includes('trực') || slug.includes('truc')) fallbackName = 'bacsi_truc.png';
+
+        if (fallbackName) {
+          const fbPath = path.join(process.cwd(), 'templates', 'signatures', fallbackName);
+          if (fs.existsSync(fbPath)) {
+            sigBuffer = fs.readFileSync(fbPath);
+          }
+        }
+      }
+
+      if (sigBuffer) {
+        try {
+          let embeddedSig;
+          const isPng =
+            sigBuffer.length > 4 &&
+            sigBuffer[0] === 0x89 &&
+            sigBuffer[1] === 0x50 &&
+            sigBuffer[2] === 0x4e &&
+            sigBuffer[3] === 0x47;
+          if (isPng) {
+            embeddedSig = await pdfDoc.embedPng(sigBuffer);
+          } else {
+            embeddedSig = await pdfDoc.embedJpg(sigBuffer);
+          }
+
+          const { width: origW, height: origH } = embeddedSig.size();
+          const targetH = 45; // Chiều cao ảnh chữ ký
+          let targetW = (origW / origH) * targetH;
+          if (targetW > 180) targetW = 180;
+
+          const sigX = centerX - targetW / 2;
+          const sigY = ySigCenter - targetH / 2;
+
+          pg.drawImage(embeddedSig, {
+            x: sigX,
+            y: sigY,
+            width: targetW,
+            height: targetH,
+          });
+        } catch (e) {
+          console.error('[HpvPdfService] Lỗi nhúng ảnh chữ ký:', e);
+        }
+      }
+    }
+
+    // Đóng con dấu đỏ công ty GenHD nếu đã được Admin xác nhận trả kết quả
+    if (caseItem.trangThai === 'da_tra_ket_qua' || caseItem.status === 'diagnosed') {
+      const centerStampY = (ySigCenter + yName) / 2;
+      await this.drawOfficialStamp(pdfDoc, pg, centerX, centerStampY);
+    }
+  }
+
   /**
    * Xử lý vẽ kết quả HPV (HPV 40, HPV 20, HPV 23)
    */
@@ -115,20 +278,31 @@ export class HpvPdfService extends BasePdfService {
         { bold: true, size: 9.5, color: r3Pos ? redColor : blueColor },
       );
 
-      // 4. KẾT LUẬN (Chữ trong suốt đè lên khung xanh, không nền trắng)
+      // 4. KẾT LUẬN & KHUYẾN NGHỊ (Căn chuẩn 2 cột: Cột nhãn X=43.5, Cột nội dung X=125)
       const klText = (caseItem.ketLuan || 'ÂM TÍNH VỚI CÁC TYPE HPV KHẢO SÁT.').toUpperCase();
-      drawText(klText, 115, 262.9, {
+      drawText(klText, 125, 262.9, {
         bold: true,
-        size: 9.0,
+        size: 8.5,
         color: blueColor,
+      });
+
+      const knText = (caseItem.khuyenNghi && caseItem.khuyenNghi.trim()) ? caseItem.khuyenNghi.trim() : 'Không có';
+      drawText('KHUYẾN NGHỊ:', 43.5, 246.0, {
+        bold: true,
+        size: 8.5,
+        color: blueColor,
+      });
+      drawText(knText, 125, 246.0, {
+        size: 8.5,
+        color: textColor,
       });
 
       // 5. NGÀY KÝ VÀ BÁC SĨ ĐỌC KẾT QUẢ
       // Che phần chấm "Hà Nội, ngày ..... tháng ..... năm 202..."
       pg.drawRectangle({
-        x: 350,
+        x: 340,
         y: 209,
-        width: 170,
+        width: 190,
         height: 12,
         color: rgb(1, 1, 1),
       });
@@ -140,19 +314,22 @@ export class HpvPdfService extends BasePdfService {
           dStr = `Hà Nội, ngày ${parts[0]} tháng ${parts[1]} năm ${parts[2]}`;
         }
       }
-      drawCentered(dStr, 350, 510, 214.1, { size: 8.5, color: rgb(0.25, 0.3, 0.35) });
+      drawCentered(dStr, 330, 540, 214.1, { size: 8.5, color: rgb(0.25, 0.3, 0.35) });
 
-      // Nếu bác sĩ đọc khác tên in sẵn "BS CK1 PHẠM THẾ HÙNG"
-      if (caseItem.bacSiDoc && caseItem.bacSiDoc !== 'BS CK1 PHẠM THẾ HÙNG') {
-        pg.drawRectangle({
-          x: 340,
-          y: 122.5,
-          width: 210,
-          height: 13,
-          color: rgb(1, 1, 1),
-        });
-        drawCentered(caseItem.bacSiDoc, 340, 550, 124.8, { bold: true, size: 9.5 });
-      }
+      // Đổ tên, chú thích và chữ ký Bác sĩ căn giữa tuyệt đối
+      await this.renderDoctorSignatureBlock({
+        pdfDoc,
+        pg,
+        caseItem,
+        centerX: 435,
+        yName: 124.8,
+        yTitle: 111.0,
+        ySigCenter: 165.0,
+        maskBox: { x: 330, y: 98, width: 210, height: 38 },
+        fontR,
+        fontB,
+        textColor,
+      });
       return;
     }
 
@@ -249,20 +426,33 @@ export class HpvPdfService extends BasePdfService {
         { bold: true, size: 9.5, color: r4Pos ? redColor : blueColor },
       );
 
-      // 4. KẾT LUẬN (Chữ trong suốt đè lên khung xanh tại Y=214.0)
+      // 4. KẾT LUẬN & KHUYẾN NGHỊ (Căn chuẩn 2 cột: Cột nhãn X=43.5, Cột nội dung X=125)
       const klText = (caseItem.ketLuan || 'ÂM TÍNH VỚI VIRUS HPV (40 TYPE TRÊN) TRÊN MẪU NHẬN ĐƯỢC.').toUpperCase();
-      drawText(klText, 115, 214.0, {
+      // Hàng trên: Y = 231.9 khớp chính xác baseline chữ "KẾT LUẬN:" in sẵn (Y=231.91), X = 125 căn thẳng cột nội dung
+      drawText(klText, 125, 231.9, {
         bold: true,
         size: 8.5,
         color: blueColor,
       });
 
+      // Hàng dưới: Nâng Y lên 216.0 cho cả nhãn "KHUYẾN NGHỊ:" và nội dung để thoáng đáy khung
+      const knText = (caseItem.khuyenNghi && caseItem.khuyenNghi.trim()) ? caseItem.khuyenNghi.trim() : 'Không có';
+      drawText('KHUYẾN NGHỊ:', 43.5, 216.0, {
+        bold: true,
+        size: 8.5,
+        color: blueColor,
+      });
+      drawText(knText, 125, 216.0, {
+        size: 8.5,
+        color: textColor,
+      });
+
       // 5. NGÀY KÝ VÀ BÁC SĨ ĐỌC KẾT QUẢ
       // Che phần chấm "Hà Nội, ngày ..... tháng ..... năm 202..." tại Y=178
       pg.drawRectangle({
-        x: 350,
+        x: 340,
         y: 178,
-        width: 170,
+        width: 190,
         height: 12,
         color: rgb(1, 1, 1),
       });
@@ -274,19 +464,23 @@ export class HpvPdfService extends BasePdfService {
           dStr = `Hà Nội, ngày ${parts[0]} tháng ${parts[1]} năm ${parts[2]}`;
         }
       }
-      drawCentered(dStr, 350, 510, 183.0, { size: 8.5, color: rgb(0.25, 0.3, 0.35) });
+      drawCentered(dStr, 330, 540, 183.0, { size: 8.5, color: rgb(0.25, 0.3, 0.35) });
 
-      // Nếu bác sĩ đọc khác tên in sẵn "BS CK1 PHẠM THẾ HÙNG"
-      if (caseItem.bacSiDoc && caseItem.bacSiDoc !== 'BS CK1 PHẠM THẾ HÙNG') {
-        pg.drawRectangle({
-          x: 340,
-          y: 91.0,
-          width: 210,
-          height: 13,
-          color: rgb(1, 1, 1),
-        });
-        drawCentered(caseItem.bacSiDoc, 340, 550, 93.6, { bold: true, size: 9.5 });
-      }
+      // Đổ tên, chú thích và chữ ký Bác sĩ căn giữa tuyệt đối
+      // Mép trên khung vàng "GHI CHÚ & CHÚ Ý" nằm tại Y = 76.7; đặt đáy maskBox tại Y = 77.5 để che sạch phôi cũ mà hoàn toàn không đè lên khung vàng
+      await this.renderDoctorSignatureBlock({
+        pdfDoc,
+        pg,
+        caseItem,
+        centerX: 435,
+        yName: 94.0,
+        yTitle: 82.5,
+        ySigCenter: 133.5,
+        maskBox: { x: 330, y: 77.5, width: 210, height: 29 },
+        fontR,
+        fontB,
+        textColor,
+      });
 
       // 6. NẾU CÓ BIỂU ĐỒ REAL-TIME PCR
       if (caseItem.hienBieuDo && caseItem.anhHpv) {
@@ -419,7 +613,7 @@ export class HpvPdfService extends BasePdfService {
         { bold: r4Pos, size: 9.5, color: r4Pos ? redColor : blueColor },
       );
 
-      // 4. KẾT LUẬN (Khung KẾT LUẬN của HPV 23 tại Y = 251.8)
+      // 4. KẾT LUẬN & KHUYẾN NGHỊ (Khung KẾT LUẬN của HPV 23: hàng trên Kết luận, hàng dưới Khuyến nghị)
       const hasPos = r1Pos || r2Pos || r3Pos || r4Pos;
       let klText = caseItem.ketLuan || '';
       if (!klText) {
@@ -429,18 +623,31 @@ export class HpvPdfService extends BasePdfService {
           klText = 'ÂM TÍNH VỚI VIRUS HPV (23 TYPE TRÊN) TRÊN MẪU NHẬN ĐƯỢC.';
         }
       }
-      drawText(klText.toUpperCase(), 115, 251.8, {
+      // Hàng trên: Kết luận (căn thẳng cột nội dung X = 125)
+      drawText(klText.toUpperCase(), 125, 251.8, {
         bold: true,
-        size: 9.0,
+        size: 8.5,
         color: hasPos ? redColor : blueColor,
+      });
+
+      // Hàng dưới: Khuyến nghị (nhãn X = 43.5, nội dung X = 125)
+      const knText = (caseItem.khuyenNghi && caseItem.khuyenNghi.trim()) ? caseItem.khuyenNghi.trim() : 'Không có';
+      drawText('KHUYẾN NGHỊ:', 43.5, 235.0, {
+        bold: true,
+        size: 8.5,
+        color: blueColor,
+      });
+      drawText(knText, 125, 235.0, {
+        size: 8.5,
+        color: textColor,
       });
 
       // 5. NGÀY KÝ VÀ BÁC SĨ ĐỌC KẾT QUẢ
       // Che dòng chữ chấm "Hà Nội, ngày ..... tháng ..... năm 202..." tại Y = 203.1
       pg.drawRectangle({
-        x: 350,
+        x: 340,
         y: 198,
-        width: 175,
+        width: 190,
         height: 12,
         color: rgb(1, 1, 1),
       });
@@ -452,11 +659,22 @@ export class HpvPdfService extends BasePdfService {
           dStr = `Hà Nội, ngày ${parts[0]} tháng ${parts[1]} năm ${parts[2]}`;
         }
       }
-      drawCentered(dStr, 350, 520, 203.1, { size: 8.5, color: rgb(0.25, 0.3, 0.35) });
+      drawCentered(dStr, 330, 540, 203.1, { size: 8.5, color: rgb(0.25, 0.3, 0.35) });
 
-      // Bác sĩ đọc kết quả (in đậm, căn giữa dưới tiêu đề BÁC SĨ ĐỌC KẾT QUẢ)
-      const bs = caseItem.bacSiDoc || 'BS CK1 PHẠM THẾ HÙNG';
-      drawCentered(bs, 330, 530, 118.0, { bold: true, size: 9.5 });
+      // Đổ tên, chú thích và chữ ký Bác sĩ căn giữa tuyệt đối
+      await this.renderDoctorSignatureBlock({
+        pdfDoc,
+        pg,
+        caseItem,
+        centerX: 435,
+        yName: 118.0,
+        yTitle: 104.0,
+        ySigCenter: 156.0,
+        maskBox: { x: 330, y: 92, width: 210, height: 38 },
+        fontR,
+        fontB,
+        textColor,
+      });
 
       // 6. NẾU CÓ BIỂU ĐỒ REAL-TIME PCR
       if (caseItem.hienBieuDo && caseItem.anhHpv) {

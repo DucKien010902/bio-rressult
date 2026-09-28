@@ -1,12 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import ExcelJS from 'exceljs';
 import { BioCase, CaseStatus } from './schemas/case.schema.js';
+import { UsersService } from '../users/users.service.js';
+import { SettingsService } from '../settings/settings.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class CasesService {
   constructor(
     @InjectModel(BioCase.name) private caseModel: Model<BioCase>,
+    private readonly usersService: UsersService,
+    private readonly settingsService: SettingsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(
@@ -57,7 +64,7 @@ export class CasesService {
       conditions.push({ donVi: new RegExp(donVi.trim(), 'i') });
     }
 
-    // Tìm kiếm từ khóa (Mã số, tên bệnh nhân, điện thoại...)
+    // Tìm kiếm từ khóa (Mã số, tên bệnh nhân, điện thoại, tên nguồn/đơn vị, tên bác sĩ...)
     if (keyword && keyword.trim() !== '') {
       const regex = new RegExp(keyword.trim(), 'i');
       conditions.push({
@@ -68,12 +75,27 @@ export class CasesService {
           { patientCode: regex },
           { soDienThoai: regex },
           { donVi: regex },
+          { nguoiNhap: regex },
+          { bacSiDoc: regex },
+          { bacSiDoc2: regex },
+          { doctorName: regex },
+          { bacSiChiDinh: regex },
+          { chanDoanLamSang: regex },
         ],
       });
     }
 
     const query = conditions.length > 0 ? { $and: conditions } : {};
-    return this.caseModel.find(query).sort({ createdAt: -1 }).exec();
+    console.log('[CasesService.findAll] Executing query:', JSON.stringify(query));
+    const start = Date.now();
+    const result = await this.caseModel
+      .find(query)
+      .select('-anhTeBao -anhGpb -anhHpv -pdfBuffer -bieuDoHpv -signatureImage')
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+    console.log(`[CasesService.findAll] Completed in ${Date.now() - start}ms, returned ${result.length} cases`);
+    return result as any;
   }
 
   async findOne(id: string): Promise<BioCase> {
@@ -105,16 +127,63 @@ export class CasesService {
     return Array.from(sourcesSet);
   }
 
-  async create(data: Partial<BioCase>): Promise<BioCase> {
+  getCategoryLabel(cat?: string): string {
+    if (!cat) return 'Xét nghiệm';
+    const c = cat.toLowerCase();
+    if (c.includes('combo')) return 'Combo (HPV + Tế bào)';
+    if (c.includes('hpv40')) return 'HPV 40 Type';
+    if (c.includes('hpv23')) return 'HPV 23 Type';
+    if (c.includes('hpv20')) return 'HPV 20 Type';
+    if (c.includes('thinprep')) return 'Tế bào học ThinPrep';
+    if (c.includes('cell')) return 'Tế bào học âm đạo';
+    if (c.includes('soituoi')) return 'Soi tươi dịch âm đạo';
+    if (c.includes('giaiphaubenh') || c.includes('gpb')) return 'Giải phẫu bệnh';
+    return cat;
+  }
+
+  async getDoctors(): Promise<any[]> {
+    return this.usersService.findDoctors();
+  }
+
+  async create(data: Partial<BioCase>, creatorUser?: any): Promise<BioCase> {
     const newCase = new this.caseModel({
       ...data,
       trangThai: data.trangThai || 'nhap_thong_tin',
       status: data.status || 'pending',
     });
-    return newCase.save();
+    const saved = await newCase.save();
+
+    // 1. Khi nguồn tạo đơn -> Thông báo tới Admin để còn biết nhận mẫu
+    try {
+      const sourceName =
+        saved.donVi ||
+        (creatorUser?.role === 'lab' ? creatorUser.donVi : '') ||
+        saved.nguoiNhap ||
+        'Nguồn gửi mẫu';
+
+      await this.notificationsService.createNotification({
+        title: `Đơn xét nghiệm mới cần nhận mẫu: ${saved.maSo}`,
+        message: `Đơn vị "${sourceName}" vừa tạo đơn xét nghiệm cho bệnh nhân ${saved.hoTen} (${saved.maSo}) - Dịch vụ: ${this.getCategoryLabel(saved.loaiXetNghiem)}. Vui lòng kiểm tra và tiếp nhận mẫu.`,
+        testResultId: saved._id.toString(),
+        caseCode: saved.maSo,
+        patientName: saved.hoTen,
+        sourceName: saved.donVi || sourceName,
+        recipientRole: 'admin',
+        type: 'new_order',
+      });
+    } catch (err) {
+      console.error('[CasesService.create] Lỗi tạo thông báo:', err);
+    }
+
+    return saved;
   }
 
   async update(id: string, data: Partial<BioCase>): Promise<BioCase> {
+    const existing = await this.caseModel.findById(id);
+    if (!existing) {
+      throw new NotFoundException('Không tìm thấy ca xét nghiệm để cập nhật');
+    }
+
     const cleanData = { ...data };
     delete (cleanData as any)._id;
     delete (cleanData as any).createdAt;
@@ -128,18 +197,103 @@ export class CasesService {
     if (!updated) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm để cập nhật');
     }
+
+    // Kiểm tra & gửi thông báo theo các sự kiện cập nhật
+    try {
+      // 3b. Khi phân Bác sĩ mới qua form cập nhật -> Thông báo tới Bác sĩ
+      if (
+        data.bacSiDoc &&
+        data.bacSiDoc.trim() &&
+        data.bacSiDoc.trim() !== (existing.bacSiDoc || '').trim()
+      ) {
+        await this.notificationsService.createNotification({
+          title: `Bạn có ca xét nghiệm mới được phân công: ${updated.maSo}`,
+          message: `Bạn được phân công đọc kết quả xét nghiệm cho bệnh nhân ${updated.hoTen} (${updated.maSo}) - Dịch vụ: ${this.getCategoryLabel(updated.loaiXetNghiem)}. Vui lòng kiểm tra và chẩn đoán.`,
+          testResultId: updated._id.toString(),
+          caseCode: updated.maSo,
+          patientName: updated.hoTen,
+          doctorName: data.bacSiDoc.trim(),
+          recipientRole: 'doctor',
+          type: 'doctor_assigned',
+        });
+      }
+
+      if (
+        data.bacSiDoc2 &&
+        data.bacSiDoc2.trim() &&
+        data.bacSiDoc2.trim() !== (existing.bacSiDoc2 || '').trim()
+      ) {
+        await this.notificationsService.createNotification({
+          title: `Bạn có ca xét nghiệm mới được phân công (Phần 2): ${updated.maSo}`,
+          message: `Bạn được phân công đọc kết quả xét nghiệm phần Tế bào cho bệnh nhân ${updated.hoTen} (${updated.maSo}). Vui lòng kiểm tra và chẩn đoán.`,
+          testResultId: updated._id.toString(),
+          caseCode: updated.maSo,
+          patientName: updated.hoTen,
+          doctorName: data.bacSiDoc2.trim(),
+          recipientRole: 'doctor',
+          type: 'doctor_assigned',
+        });
+      }
+
+      // 4b. Khi Bác sĩ ký duyệt (qua toggle nút Ký duyệt ở trang chi tiết) -> Thông báo lại Admin
+      if (data.daKy === true && !existing.daKy) {
+        const doc = data.bacSiDoc || updated.bacSiDoc || 'Bác sĩ';
+        await this.notificationsService.createNotification({
+          title: `Bác sĩ đã ký duyệt kết quả: ${updated.maSo}`,
+          message: `Bác sĩ ${doc} đã ký duyệt hoàn tất kết quả xét nghiệm cho bệnh nhân ${updated.hoTen} (${updated.maSo}). Vui lòng kiểm tra và xác nhận trả kết quả.`,
+          testResultId: updated._id.toString(),
+          caseCode: updated.maSo,
+          patientName: updated.hoTen,
+          doctorName: doc,
+          recipientRole: 'admin',
+          type: 'result_signed',
+        });
+      }
+
+      if (data.daKy2 === true && !existing.daKy2) {
+        const doc2 = data.bacSiDoc2 || updated.bacSiDoc2 || 'Bác sĩ phần 2';
+        await this.notificationsService.createNotification({
+          title: `Bác sĩ đã ký duyệt kết quả Phần 2: ${updated.maSo}`,
+          message: `Bác sĩ ${doc2} đã ký duyệt hoàn tất phần 2 cho bệnh nhân ${updated.hoTen} (${updated.maSo}). Vui lòng kiểm tra và xác nhận trả kết quả.`,
+          testResultId: updated._id.toString(),
+          caseCode: updated.maSo,
+          patientName: updated.hoTen,
+          doctorName: doc2,
+          recipientRole: 'admin',
+          type: 'result_signed',
+        });
+      }
+    } catch (err) {
+      console.error('[CasesService.update] Lỗi tạo thông báo:', err);
+    }
+
     return updated;
   }
 
   // Tiếp nhận ca xét nghiệm (chuyển trạng thái sang chay_ket_qua)
   async acceptCase(id: string, bacSiDoc?: string): Promise<BioCase> {
+    const existing = await this.caseModel.findById(id);
+    if (!existing) {
+      throw new NotFoundException('Không tìm thấy ca xét nghiệm để tiếp nhận');
+    }
+
+    const now = new Date();
+    const turnaroundMap = await this.settingsService.getTurnaroundTime();
+    const hours = turnaroundMap[existing.loaiXetNghiem] || 24;
+    const ngayDuKienTraDate = new Date(now.getTime() + hours * 3600 * 1000);
+
     const updatePayload: any = {
       trangThai: 'chay_ket_qua',
       status: 'tested',
+      ngayNhanMau: existing.ngayNhanMau || now.toISOString(),
+      ngayDuKienTra: ngayDuKienTraDate.toISOString(),
     };
     if (bacSiDoc) {
       updatePayload.bacSiDoc = bacSiDoc;
       updatePayload.doctorName = bacSiDoc;
+      if (existing.loaiXetNghiem?.startsWith('combo_') && !existing.bacSiDoc2) {
+        updatePayload.bacSiDoc2 = bacSiDoc;
+      }
     }
     const updated = await this.caseModel.findByIdAndUpdate(
       id,
@@ -149,6 +303,39 @@ export class CasesService {
     if (!updated) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm để tiếp nhận');
     }
+
+    // 2. Khi Admin nhận mẫu -> Thông báo lại Nguồn
+    try {
+      if (updated.donVi) {
+        await this.notificationsService.createNotification({
+          title: `Phòng Lab đã tiếp nhận mẫu: ${updated.maSo}`,
+          message: `Mẫu xét nghiệm của bệnh nhân ${updated.hoTen} (${updated.maSo}) từ đơn vị "${updated.donVi}" đã được phòng Lab tiếp nhận và bắt đầu thực hiện xét nghiệm.${bacSiDoc ? ` Bác sĩ phân công: ${bacSiDoc}.` : ''}`,
+          testResultId: updated._id.toString(),
+          caseCode: updated.maSo,
+          patientName: updated.hoTen,
+          sourceName: updated.donVi,
+          recipientRole: 'source',
+          type: 'sample_accepted',
+        });
+      }
+
+      // 3. Khi phân Bác sĩ -> Thông báo tới Bác sĩ
+      if (bacSiDoc) {
+        await this.notificationsService.createNotification({
+          title: `Bạn có ca xét nghiệm mới cần đọc KQ: ${updated.maSo}`,
+          message: `Bạn được phân công đọc kết quả xét nghiệm cho bệnh nhân ${updated.hoTen} (${updated.maSo}) - Dịch vụ: ${this.getCategoryLabel(updated.loaiXetNghiem)}. Vui lòng kiểm tra và chẩn đoán.`,
+          testResultId: updated._id.toString(),
+          caseCode: updated.maSo,
+          patientName: updated.hoTen,
+          doctorName: bacSiDoc,
+          recipientRole: 'doctor',
+          type: 'doctor_assigned',
+        });
+      }
+    } catch (err) {
+      console.error('[CasesService.acceptCase] Lỗi tạo thông báo:', err);
+    }
+
     return updated;
   }
 
@@ -182,18 +369,59 @@ export class CasesService {
     if (!updated) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm để ký duyệt');
     }
+
+    // 4. Bác sĩ đọc và ký -> Thông báo lại Admin
+    try {
+      const doc = payload.bacSiDoc || updated.bacSiDoc || 'Bác sĩ';
+      await this.notificationsService.createNotification({
+        title: `Bác sĩ đã ký duyệt kết quả: ${updated.maSo}`,
+        message: `Bác sĩ ${doc} đã hoàn tất đọc và ký duyệt kết quả cho bệnh nhân ${updated.hoTen} (${updated.maSo}). Vui lòng kiểm tra và xác nhận trả kết quả.`,
+        testResultId: updated._id.toString(),
+        caseCode: updated.maSo,
+        patientName: updated.hoTen,
+        doctorName: doc,
+        recipientRole: 'admin',
+        type: 'result_signed',
+      });
+    } catch (err) {
+      console.error('[CasesService.signAndDiagnose] Lỗi tạo thông báo:', err);
+    }
+
     return updated;
   }
 
-  // Admin duyệt và Trả kết quả (da_tra_ket_qua)
+  // Admin duyệt và Trả kết quả (da_tra_ket_qua) sau khi Bác sĩ đã ký duyệt
   async releaseResult(id: string): Promise<BioCase> {
+    const existing = await this.caseModel.findById(id);
+    if (!existing) {
+      throw new NotFoundException('Không tìm thấy ca xét nghiệm');
+    }
+
+    const isReleased = existing.trangThai === 'da_tra_ket_qua';
+
+    // Nếu chưa trả kết quả thì Bác sĩ bắt buộc phải ký duyệt trước
+    if (!isReleased) {
+      const isCombo = existing.loaiXetNghiem?.startsWith('combo_');
+      const isSigned = isCombo
+        ? !!(existing.daKy && existing.daKy2)
+        : !!existing.daKy;
+
+      if (!isSigned) {
+        throw new BadRequestException(
+          'Bác sĩ chưa ký duyệt đầy đủ kết quả, không thể xác nhận trả kết quả!',
+        );
+      }
+    }
+
     const updated = await this.caseModel.findByIdAndUpdate(
       id,
       {
         $set: {
-          trangThai: 'da_tra_ket_qua',
-          status: 'diagnosed',
-          ngayTraKetQua: new Date().toISOString().split('T')[0],
+          trangThai: isReleased ? 'chay_ket_qua' : 'da_tra_ket_qua',
+          status: isReleased ? 'testing' : 'diagnosed',
+          ngayTraKetQua: isReleased
+            ? null
+            : new Date().toISOString().split('T')[0],
         },
       },
       { new: true },
@@ -201,6 +429,25 @@ export class CasesService {
     if (!updated) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm');
     }
+
+    // 5. Khi Admin trả kết quả -> Thông báo lại Nguồn
+    try {
+      if (updated.trangThai === 'da_tra_ket_qua' && updated.donVi) {
+        await this.notificationsService.createNotification({
+          title: `Đã có kết quả chính thức: ${updated.maSo}`,
+          message: `Ca xét nghiệm của bệnh nhân ${updated.hoTen} (${updated.maSo}) từ đơn vị "${updated.donVi}" đã có kết quả chính thức và đã được đóng dấu phê duyệt. Bạn có thể xem và tải phiếu kết quả ngay.`,
+          testResultId: updated._id.toString(),
+          caseCode: updated.maSo,
+          patientName: updated.hoTen,
+          sourceName: updated.donVi,
+          recipientRole: 'source',
+          type: 'result_released',
+        });
+      }
+    } catch (err) {
+      console.error('[CasesService.releaseResult] Lỗi tạo thông báo:', err);
+    }
+
     return updated;
   }
 
@@ -455,6 +702,193 @@ export class CasesService {
     }
 
     return csv;
+  }
+
+  // Xuất danh sách ca xét nghiệm ra file Excel (.xlsx) chuẩn định dạng ô lưới
+  async exportCasesExcel(
+    category?: string,
+    month?: string,
+    status?: string,
+    doctor?: string,
+    donVi?: string,
+  ): Promise<Buffer> {
+    const conditions: any[] = [];
+
+    // Lọc theo trạng thái
+    if (status && status !== 'all') {
+      conditions.push({
+        $or: [{ status }, { trangThai: status }],
+      });
+    }
+
+    // Lọc theo danh mục dịch vụ (category)
+    if (category && category !== 'all' && category !== 'dashboard') {
+      conditions.push({
+        $or: [
+          { loaiXetNghiem: category },
+          { testType: category },
+        ],
+      });
+    }
+
+    // Lọc theo tháng (month format YYYY-MM, e.g., '2026-09')
+    if (month && month !== 'all' && /^\d{4}-\d{2}$/.test(month)) {
+      const [year, m] = month.split('-').map(Number);
+      const startDate = new Date(year, m - 1, 1, 0, 0, 0, 0);
+      const endDate = new Date(year, m, 0, 23, 59, 59, 999);
+      conditions.push({
+        createdAt: { $gte: startDate, $lte: endDate },
+      });
+    }
+
+    // Lọc theo bác sĩ
+    if (doctor && doctor.trim() !== '') {
+      const regex = new RegExp(doctor.trim(), 'i');
+      conditions.push({
+        $or: [{ bacSiDoc: regex }, { bacSiDoc2: regex }, { doctorName: regex }],
+      });
+    }
+
+    // Lọc theo đơn vị
+    if (donVi && donVi.trim() !== '') {
+      conditions.push({ donVi: new RegExp(donVi.trim(), 'i') });
+    }
+
+    const query = conditions.length > 0 ? { $and: conditions } : {};
+    const cases = await this.caseModel
+      .find(query)
+      .select('-anhTeBao -anhTeBao2 -anhGpb -anhHpv -pdfBuffer -bieuDoHpv -signatureImage -anhSoiTuoi -anhSoiTuoi1 -anhSoiTuoi2 -anhKy -anhKy2')
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'GenHD System';
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet('Danh sách ca xét nghiệm', {
+      views: [{ showGridLines: true }],
+    });
+
+    const categoryNamesMap: Record<string, string> = {
+      cell: 'Xét nghiệm Cell',
+      thinprep: 'Xét nghiệm ThinPrep',
+      hpv40: 'Xét nghiệm HPV 40 Types',
+      hpv20: 'Xét nghiệm HPV 20 Types',
+      hpv23: 'Xét nghiệm HPV 23 Types',
+      soituoi: 'Xét nghiệm Soi tươi',
+      giaiphaubenh: 'Giải Phẫu Bệnh',
+      combo_hpv20_cell: 'Combo HPV 20 + Cell',
+      combo_hpv40_cell: 'Combo HPV 40 + Cell',
+      combo_hpv23_cell: 'Combo HPV 23 + Cell',
+      combo_hpv20_thinprep: 'Combo HPV 20 + ThinPrep',
+      combo_hpv40_thinprep: 'Combo HPV 40 + ThinPrep',
+      combo_hpv23_thinprep: 'Combo HPV 23 + ThinPrep',
+    };
+
+    sheet.columns = [
+      { header: 'STT', key: 'stt', width: 8 },
+      { header: 'MÃ SỐ PHIẾU', key: 'maSo', width: 22 },
+      { header: 'DỊCH VỤ XÉT NGHIỆM', key: 'loaiXetNghiem', width: 28 },
+      { header: 'HỌ VÀ TÊN BỆNH NHÂN', key: 'hoTen', width: 28 },
+      { header: 'NĂM SINH', key: 'namSinh', width: 12 },
+      { header: 'GIỚI TÍNH', key: 'gioiTinh', width: 12 },
+      { header: 'SỐ ĐIỆN THOẠI', key: 'soDienThoai', width: 18 },
+      { header: 'ĐỊA CHỈ', key: 'diaChi', width: 35 },
+      { header: 'LOẠI MẪU', key: 'loaiMau', width: 18 },
+      { header: 'ĐƠN VỊ GỬI MẪU', key: 'donVi', width: 30 },
+      { header: 'BÁC SĨ CHỈ ĐỊNH', key: 'bacSiChiDinh', width: 25 },
+      { header: 'BÁC SĨ ĐỌC KẾT QUẢ', key: 'bacSiDoc', width: 30 },
+      { header: 'KẾT LUẬN / CHẨN ĐOÁN', key: 'ketLuan', width: 45 },
+      { header: 'TRẠNG THÁI', key: 'trangThai', width: 18 },
+      { header: 'NGÀY TIẾP NHẬN', key: 'ngayNhanMau', width: 16 },
+      { header: 'NGÀY DỰ KIẾN TRẢ', key: 'ngayDuKienTra', width: 16 },
+      { header: 'NGÀY TRẢ KẾT QUẢ', key: 'ngayTraKetQua', width: 16 },
+    ];
+
+    // Định dạng tiêu đề cột (Header row)
+    const headerRow = sheet.getRow(1);
+    headerRow.height = 30;
+    headerRow.eachCell((cell) => {
+      cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF0070F3' },
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+        bottom: { style: 'medium', color: { argb: 'FF003399' } },
+        right: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      };
+    });
+
+    // Thêm các dòng dữ liệu ca bệnh
+    cases.forEach((c: any, index: number) => {
+      const catLabel = categoryNamesMap[c.loaiXetNghiem] || c.loaiXetNghiem || '';
+      const statusLabel =
+        c.trangThai === 'da_tra_ket_qua'
+          ? 'Đã trả kết quả'
+          : c.trangThai === 'chay_ket_qua'
+          ? 'Chạy kết quả'
+          : 'Nhập thông tin';
+
+      const doctorText = [c.bacSiDoc, c.bacSiDoc2].filter(Boolean).join(' & ');
+      const nguoiNhapText =
+        typeof c.nguoiNhap === 'object' ? c.nguoiNhap?.fullName : c.nguoiNhap || c.donVi || '';
+
+      const formatDateStr = (dStr?: string) => {
+        if (!dStr) return '';
+        try {
+          const d = new Date(dStr);
+          if (isNaN(d.getTime())) return dStr;
+          return d.toLocaleDateString('vi-VN');
+        } catch {
+          return dStr;
+        }
+      };
+
+      const row = sheet.addRow({
+        stt: index + 1,
+        maSo: c.maSo || '',
+        loaiXetNghiem: catLabel,
+        hoTen: c.hoTen || '',
+        namSinh: c.namSinh || '',
+        gioiTinh: c.gioiTinh || '',
+        soDienThoai: c.soDienThoai || '',
+        diaChi: c.diaChi || '',
+        loaiMau: c.loaiMau || '',
+        donVi: nguoiNhapText,
+        bacSiChiDinh: c.bacSiChiDinh || '',
+        bacSiDoc: doctorText,
+        ketLuan: c.ketLuan || c.chanDoanLamSang || '',
+        trangThai: statusLabel,
+        ngayNhanMau: formatDateStr(c.ngayNhanMau || c.createdAt),
+        ngayDuKienTra: formatDateStr(c.ngayDuKienTra),
+        ngayTraKetQua: formatDateStr(c.ngayTraKetQua),
+      });
+
+      row.height = 22;
+      row.eachCell((cell, colNumber) => {
+        cell.font = { name: 'Arial', size: 10 };
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: [1, 5, 6, 7, 14, 15, 16, 17].includes(colNumber) ? 'center' : 'left',
+          wrapText: true,
+        };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        };
+      });
+    });
+
+    const arrayBuffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(arrayBuffer);
   }
 
   async updateImageField(id: string, field: string, imageUrl: string): Promise<BioCase> {

@@ -47,6 +47,28 @@ export interface CaseItem {
 }
 
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
+import { downloadCasePdf } from '@/lib/download';
+import {
+  fetchDoctorsList,
+  type DoctorOption,
+  DEFAULT_DOCTOR_LIST,
+} from '@/lib/doctors';
+
+export const CATEGORY_NAMES_MAP: Record<string, string> = {
+  cell: 'Xét nghiệm Cell',
+  thinprep: 'Xét nghiệm ThinPrep',
+  hpv40: 'Xét nghiệm HPV 40',
+  hpv20: 'Xét nghiệm HPV 20',
+  hpv23: 'Xét nghiệm HPV 23',
+  soituoi: 'Xét nghiệm Soi tươi',
+  giaiphaubenh: 'Giải Phẫu Bệnh',
+  combo_hpv20_cell: 'Combo HPV 20 + Cell',
+  combo_hpv40_cell: 'Combo HPV 40 + Cell',
+  combo_hpv23_cell: 'Combo HPV 23 + Cell',
+  combo_hpv20_thinprep: 'Combo HPV 20 + ThinPrep',
+  combo_hpv40_thinprep: 'Combo HPV 40 + ThinPrep',
+  combo_hpv23_thinprep: 'Combo HPV 23 + ThinPrep',
+};
 
 interface TurnaroundInfo {
   timeStr: string;
@@ -186,6 +208,7 @@ export default function CaseTable({
   filterDoctorInitial = '',
 }: CaseTableProps) {
   const router = useRouter();
+  const [downloadingCaseId, setDownloadingCaseId] = useState<string | null>(null);
 
   // Turnaround times map (SLA/Deadline)
   const [turnaroundMap, setTurnaroundMap] = useState<Record<string, number>>(() => {
@@ -230,7 +253,15 @@ export default function CaseTable({
       }
     };
     fetchSla();
+
+    fetchDoctorsList().then((docs) => {
+      if (docs && docs.length > 0) {
+        setDoctorList(docs);
+      }
+    });
   }, []);
+
+  const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTOR_LIST);
 
   // Filters
   const [activeStatusTab, setActiveStatusTab] = useState<
@@ -324,7 +355,24 @@ export default function CaseTable({
         const matchName = item.hoTen?.toLowerCase().includes(kw);
         const matchCode = item.maSo?.toLowerCase().includes(kw);
         const matchPhone = item.soDienThoai?.includes(kw);
-        if (!matchName && !matchCode && !matchPhone) return false;
+        
+        // Tìm theo tên Nguồn / Đơn vị
+        const sourceName =
+          typeof item.nguoiNhap === 'object'
+            ? item.nguoiNhap?.fullName
+            : item.nguoiNhap || item.donVi;
+        const matchSource = (sourceName || '').toLowerCase().includes(kw) || (item.donVi || '').toLowerCase().includes(kw);
+
+        // Tìm theo tên Bác sĩ đọc KQ & Bác sĩ chỉ định
+        const matchDoctor =
+          (item.bacSiDoc || '').toLowerCase().includes(kw) ||
+          ((item as any).bacSiDoc2 || '').toLowerCase().includes(kw) ||
+          ((item as any).doctorName || '').toLowerCase().includes(kw) ||
+          (item.bacSiChiDinh || '').toLowerCase().includes(kw);
+
+        const matchDiagnosis = (item.chanDoanLamSang || '').toLowerCase().includes(kw);
+
+        if (!matchName && !matchCode && !matchPhone && !matchSource && !matchDoctor && !matchDiagnosis) return false;
       }
       if (selectedSource !== 'all') {
         const sourceName =
@@ -504,7 +552,7 @@ export default function CaseTable({
               type="text"
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="Tìm theo Tên, Mã số, SĐT..."
+              placeholder="Tìm theo Tên, Mã số, SĐT, Nguồn, Bác sĩ..."
               className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#0070f3] transition-all font-medium"
             />
           </div>
@@ -627,7 +675,12 @@ export default function CaseTable({
                     >
                       {/* Mã số */}
                       <td className={`py-3.5 px-4 font-bold text-[#0070f3] hover:underline relative ${firstCellBorder}`}>
-                        <span>{item.maSo}</span>
+                        <span className="block leading-tight">{item.maSo}</span>
+                        {item.loaiXetNghiem && (
+                          <span className="inline-block text-[10px] font-semibold text-slate-500 bg-slate-100/90 border border-slate-200/80 px-1.5 py-0.5 rounded-md mt-1 select-none">
+                            {CATEGORY_NAMES_MAP[item.loaiXetNghiem] || item.loaiXetNghiem}
+                          </span>
+                        )}
                       </td>
 
                       {/* Họ và tên */}
@@ -780,17 +833,35 @@ export default function CaseTable({
                           >
                             {/* 1. Tải kết quả (PDF) */}
                             <button
-                              onClick={() => {
+                              disabled={downloadingCaseId === item._id}
+                              onClick={async () => {
                                 setOpenActionId(null);
-                                window.open(
-                                  getApiUrl(`/cases/${item._id}/export-pdf`),
-                                  '_blank'
-                                );
+                                try {
+                                  setDownloadingCaseId(item._id);
+                                  toast.info(`Đang tải PDF phiếu ${item.maSo || ''}...`, 'Đang xử lý');
+                                  await downloadCasePdf({
+                                    caseId: item._id,
+                                    patientName: item.hoTen,
+                                    maSo: item.maSo,
+                                  });
+                                  toast.success(`Đã tải PDF phiếu ${item.maSo || ''} thành công!`, 'Tải hoàn tất');
+                                } catch (err: any) {
+                                  console.error('Lỗi khi tải PDF:', err);
+                                  toast.error(err.message || 'Không thể tải file PDF!', 'Lỗi tải xuống');
+                                } finally {
+                                  setDownloadingCaseId(null);
+                                }
                               }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer disabled:opacity-50"
                             >
-                              <Download className="w-4 h-4 text-emerald-600" />
-                              <span>Tải kết quả (PDF)</span>
+                              {downloadingCaseId === item._id ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+                              ) : (
+                                <Download className="w-4 h-4 text-emerald-600" />
+                              )}
+                              <span>
+                                {downloadingCaseId === item._id ? 'Đang tải PDF...' : 'Tải kết quả (PDF)'}
+                              </span>
                             </button>
 
                             {/* 2. Sửa thông tin phiếu */}
@@ -990,11 +1061,11 @@ export default function CaseTable({
                   onChange={(e) => setSelectedDoctorForAccept(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer shadow-2xs"
                 >
-                  <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
-                  <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
-                  <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
-                  <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
-                  <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
+                  {doctorList.map((doc) => (
+                    <option key={doc.username || doc.fullName} value={doc.fullName}>
+                      {doc.fullName} ({doc.username})
+                    </option>
+                  ))}
                 </select>
                 <p className="text-[11px] text-slate-500 mt-1">
                   Sau khi tiếp nhận, ca xét nghiệm sẽ chuyển sang trạng thái <strong>Chạy kết quả</strong>.

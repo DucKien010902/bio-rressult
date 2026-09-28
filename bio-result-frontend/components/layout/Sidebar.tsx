@@ -13,9 +13,8 @@ import {
   Microscope,
   ClipboardList,
   Layers,
-  Dna,
+  LayoutGrid,
   LogOut,
-  Settings,
 } from 'lucide-react';
 
 export interface CategoryItem {
@@ -27,6 +26,7 @@ export interface CategoryItem {
 
 export const MENU_CATEGORIES: CategoryItem[] = [
   { id: 'dashboard', label: 'Báo cáo & Thống kê', icon: BarChart3, isSpecial: true },
+  { id: 'all', label: 'Tất cả dịch vụ', icon: LayoutGrid },
   { id: 'cell', label: 'Xét nghiệm Cell', icon: Activity },
   { id: 'thinprep', label: 'Xét nghiệm ThinPrep', icon: FlaskConical },
   { id: 'hpv40', label: 'Xét nghiệm HPV 40', icon: FileText },
@@ -61,14 +61,8 @@ export default function Sidebar({
 
   const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
   const isLab = currentUser?.role === 'lab';
-  // Chỉ Admin và tài khoản là nguồn (lab) mới được tạo mẫu, bác sĩ không được tạo
+  // Chỉ Admin và tài khoản nguồn (lab) mới được tạo mẫu
   const canCreate = isAdmin || isLab;
-
-  const handleCategoryClick = (catId: string) => {
-    if (onSelectCategory) {
-      onSelectCategory(catId);
-    }
-  };
 
   return (
     <aside
@@ -83,8 +77,8 @@ export default function Sidebar({
       >
         <div className="w-11 h-11 shrink-0 relative flex items-center justify-center">
           <Image
-            src="/logo_gentech.png"
-            alt="Logo Gentech"
+            src="/logo.png"
+            alt="Logo GENHD"
             width={44}
             height={44}
             className="object-contain"
@@ -93,9 +87,7 @@ export default function Sidebar({
         </div>
         {sidebarOpen && (
           <div className="leading-tight flex flex-col">
-            <span className="font-black text-[#003399] tracking-tight text-[18px]">
-              GENTECH
-            </span>
+            <span className="font-black text-[#003399] tracking-tight text-[18px]">GENHD</span>
             <span className="text-[11px] font-black text-slate-500 tracking-wider mt-0.5">
               VIỆT NAM
             </span>
@@ -103,7 +95,7 @@ export default function Sidebar({
         )}
       </Link>
 
-      {/* Nút Tạo phiếu mới (Chỉ hiển thị cho Admin và tài khoản Nguồn gửi mẫu) */}
+      {/* Nút Tạo phiếu mới */}
       {canCreate && (
         <div className="px-3 pt-3 pb-1.5 shrink-0">
           <Link
@@ -119,68 +111,41 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* Navigation Categories */}
+      {/* Navigation Categories — dùng Link để hoạt động từ mọi trang kể cả settings */}
       <div className="flex-1 overflow-y-auto py-2.5 px-2.5 space-y-1 custom-scrollbar">
         {MENU_CATEGORIES.map((cat) => {
           const Icon = cat.icon;
+          // Active khi ở trang chủ VÀ đúng category
           const isActive = pathname === '/' && activeCategory === cat.id;
 
           return (
-            <button
+            <Link
               key={cat.id}
-              onClick={() => handleCategoryClick(cat.id)}
+              href={`/?category=${cat.id}`}
+              onClick={() => onSelectCategory?.(cat.id)}
               title={cat.label}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13.5px] font-bold transition-all cursor-pointer relative ${
                 isActive
                   ? 'text-[#0070f3] bg-sky-50/90 font-black shadow-2xs'
-                  : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100/80 font-bold'
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100/80'
               }`}
             >
               {isActive && (
                 <span className="absolute left-0 top-2 bottom-2 w-1.5 bg-[#0070f3] rounded-r-full" />
               )}
-
               <Icon
                 className={`w-[19px] h-[19px] shrink-0 transition-colors ${
                   isActive ? 'text-[#0070f3]' : 'text-slate-600'
                 }`}
               />
-
               {sidebarOpen && (
                 <span className="truncate text-left leading-tight text-[13.5px]">
                   {cat.label}
                 </span>
               )}
-            </button>
+            </Link>
           );
         })}
-
-        {/* Settings Link (Chỉ hiển thị cho Admin) */}
-        {isAdmin && (
-          <Link
-            href="/settings"
-            title="Cài đặt hệ thống"
-            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13.5px] font-bold transition-all cursor-pointer relative mt-1 border-t border-slate-100 ${
-              pathname?.startsWith('/settings')
-                ? 'text-[#0070f3] bg-sky-50/90 font-black shadow-2xs'
-                : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100/80 font-bold'
-            }`}
-          >
-            {pathname?.startsWith('/settings') && (
-              <span className="absolute left-0 top-2 bottom-2 w-1.5 bg-[#0070f3] rounded-r-full" />
-            )}
-            <Settings
-              className={`w-[19px] h-[19px] shrink-0 transition-colors ${
-                pathname?.startsWith('/settings') ? 'text-[#0070f3]' : 'text-slate-600'
-              }`}
-            />
-            {sidebarOpen && (
-              <span className="truncate text-left leading-tight text-[13.5px]">
-                Cài đặt hệ thống
-              </span>
-            )}
-          </Link>
-        )}
       </div>
 
       {/* Bottom User Profile Pin */}

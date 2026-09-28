@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FlaskConical,
   CheckCircle2,
@@ -11,6 +11,11 @@ import {
   RotateCcw,
   Loader2,
 } from 'lucide-react';
+import {
+  fetchDoctorsList,
+  DoctorOption,
+  DEFAULT_DOCTOR_LIST,
+} from '@/lib/doctors';
 
 interface SoituoiResultCardProps {
   caseData: any;
@@ -30,7 +35,18 @@ export default function SoituoiResultCard({
   currentUser,
 }: SoituoiResultCardProps) {
   const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isLab = currentUser?.role === 'lab';
   const [collapsed, setCollapsed] = useState(false);
+
+  const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTOR_LIST);
+
+  useEffect(() => {
+    fetchDoctorsList().then((docs) => {
+      if (docs && docs.length > 0) {
+        setDoctorList(docs);
+      }
+    });
+  }, []);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden space-y-0">
@@ -42,6 +58,12 @@ export default function SoituoiResultCard({
         </div>
 
         <div className="flex items-center gap-3">
+          {isLab && (
+            <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+              Đơn vị gửi mẫu chỉ xem kết quả
+            </span>
+          )}
+
           {caseData?.trangThai === 'da_tra_ket_qua' && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -65,7 +87,7 @@ export default function SoituoiResultCard({
       </div>
 
       {!collapsed && (
-        <div className="p-6 space-y-6 text-xs text-slate-700">
+        <div className={`p-6 space-y-6 text-xs text-slate-700 ${isLab ? 'pointer-events-none select-none opacity-90' : ''}`}>
           {/* Table 5 Chỉ Tiêu Soi Tươi */}
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-left text-xs border-collapse">
@@ -86,6 +108,7 @@ export default function SoituoiResultCard({
                   <td className="py-2 px-3">
                     <input
                       type="text"
+                      disabled={isLab}
                       value={caseData?.soiTuoiBachCau || 'Âm tính'}
                       onChange={(e) => onChange('soiTuoiBachCau', e.target.value)}
                       placeholder="Âm tính / + / ++..."
@@ -98,6 +121,7 @@ export default function SoituoiResultCard({
                   <td className="py-2 px-3">
                     <input
                       type="text"
+                      disabled={isLab}
                       value={caseData?.soiTuoiGhiChuBachCau || ''}
                       onChange={(e) => onChange('soiTuoiGhiChuBachCau', e.target.value)}
                       className="w-full px-3 py-1 text-xs font-medium rounded-lg border border-slate-200 focus:outline-none focus:border-sky-500"
@@ -112,6 +136,7 @@ export default function SoituoiResultCard({
                   <td className="py-2 px-3">
                     <input
                       type="text"
+                      disabled={isLab}
                       value={caseData?.soiTuoiNam || 'Âm tính'}
                       onChange={(e) => onChange('soiTuoiNam', e.target.value)}
                       placeholder="Âm tính / Phân lập Nấm..."
@@ -124,6 +149,7 @@ export default function SoituoiResultCard({
                   <td className="py-2 px-3">
                     <input
                       type="text"
+                      disabled={isLab}
                       value={caseData?.soiTuoiGhiChuNam || ''}
                       onChange={(e) => onChange('soiTuoiGhiChuNam', e.target.value)}
                       className="w-full px-3 py-1 text-xs font-medium rounded-lg border border-slate-200 focus:outline-none focus:border-sky-500"
@@ -138,6 +164,7 @@ export default function SoituoiResultCard({
                   <td className="py-2 px-3">
                     <input
                       type="text"
+                      disabled={isLab}
                       value={caseData?.soiTuoiTapKhuan || 'Âm tính'}
                       onChange={(e) => onChange('soiTuoiTapKhuan', e.target.value)}
                       placeholder="Âm tính / Dương tính..."
@@ -150,6 +177,7 @@ export default function SoituoiResultCard({
                   <td className="py-2 px-3">
                     <input
                       type="text"
+                      disabled={isLab}
                       value={caseData?.soiTuoiGhiChuTapKhuan || ''}
                       onChange={(e) => onChange('soiTuoiGhiChuTapKhuan', e.target.value)}
                       className="w-full px-3 py-1 text-xs font-medium rounded-lg border border-slate-200 focus:outline-none focus:border-sky-500"
@@ -164,6 +192,7 @@ export default function SoituoiResultCard({
                   <td className="py-2 px-3">
                     <input
                       type="text"
+                      disabled={isLab}
                       value={caseData?.soiTuoiTeBaoBieuMo || 'Ít'}
                       onChange={(e) => onChange('soiTuoiTeBaoBieuMo', e.target.value)}
                       placeholder="Ít / Vừa / Nhiều..."
@@ -176,6 +205,7 @@ export default function SoituoiResultCard({
                   <td className="py-2 px-3">
                     <input
                       type="text"
+                      disabled={isLab}
                       value={caseData?.soiTuoiGhiChuTeBaoBieuMo || ''}
                       onChange={(e) => onChange('soiTuoiGhiChuTeBaoBieuMo', e.target.value)}
                       className="w-full px-3 py-1 text-xs font-medium rounded-lg border border-slate-200 focus:outline-none focus:border-sky-500"
@@ -190,6 +220,7 @@ export default function SoituoiResultCard({
                   <td className="py-2 px-3">
                     <input
                       type="text"
+                      disabled={isLab}
                       value={caseData?.soiTuoiTrichomonas || 'Âm tính'}
                       onChange={(e) => onChange('soiTuoiTrichomonas', e.target.value)}
                       placeholder="Âm tính / Dương tính..."
@@ -202,6 +233,7 @@ export default function SoituoiResultCard({
                   <td className="py-2 px-3">
                     <input
                       type="text"
+                      disabled={isLab}
                       value={caseData?.soiTuoiGhiChuTrichomonas || ''}
                       onChange={(e) => onChange('soiTuoiGhiChuTrichomonas', e.target.value)}
                       className="w-full px-3 py-1 text-xs font-medium rounded-lg border border-slate-200 focus:outline-none focus:border-sky-500"
@@ -220,6 +252,7 @@ export default function SoituoiResultCard({
               </label>
               <textarea
                 rows={2}
+                disabled={isLab}
                 value={
                   caseData?.ketLuan ||
                   'HỆ VI SINH VẬT TRONG GIỚI HẠN BÌNH THƯỜNG.'
@@ -235,6 +268,7 @@ export default function SoituoiResultCard({
               </label>
               <textarea
                 rows={2}
+                disabled={isLab}
                 value={caseData?.khuyenNghi || ''}
                 onChange={(e) => onChange('khuyenNghi', e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:border-[#0070f3] transition-all"
@@ -264,11 +298,11 @@ export default function SoituoiResultCard({
                       : 'text-slate-600 border-slate-200 bg-slate-100 cursor-not-allowed select-none'
                   }`}
                 >
-                  <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
-                  <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
-                  <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
-                  <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
-                  <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
+                  {doctorList.map((doc) => (
+                    <option key={doc.username || doc.fullName} value={doc.fullName}>
+                      {doc.fullName} ({doc.username})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -278,13 +312,18 @@ export default function SoituoiResultCard({
                 </span>
                 <input
                   type="date"
+                  disabled={isLab}
                   value={
                     caseData?.ngayTraKetQua
                       ? caseData.ngayTraKetQua.split('T')[0]
                       : new Date().toISOString().split('T')[0]
                   }
                   onChange={(e) => onChange('ngayTraKetQua', e.target.value)}
-                  className="text-xs py-1 px-2.5 font-bold text-slate-800 rounded-lg border-sky-300 bg-white shadow-2xs w-44 cursor-pointer"
+                  className={`text-xs py-1 px-2.5 font-bold rounded-lg border shadow-2xs w-44 ${
+                    isLab
+                      ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed select-none'
+                      : 'border-sky-300 bg-white text-slate-800 cursor-pointer'
+                  }`}
                 />
               </div>
 
@@ -296,43 +335,45 @@ export default function SoituoiResultCard({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-2 sm:pt-0">
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={isSaving}
-                className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isSaving ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Save className="w-3.5 h-3.5" />
-                )}
-                <span>Lưu kết quả Soi tươi</span>
-              </button>
+            {!isLab && (
+              <div className="flex items-center gap-2 pt-2 sm:pt-0">
+                <button
+                  type="button"
+                  onClick={onSave}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  <span>Lưu kết quả Soi tươi</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={onToggleSign}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
-                  caseData?.daKy
-                    ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
-              >
-                {caseData?.daKy ? (
-                  <>
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Hủy chữ ký</span>
-                  </>
-                ) : (
-                  <>
-                    <PenTool className="w-3.5 h-3.5" />
-                    <span>Lưu & Ký duyệt</span>
-                  </>
-                )}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={onToggleSign}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
+                    caseData?.daKy
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                >
+                  {caseData?.daKy ? (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Hủy chữ ký</span>
+                    </>
+                  ) : (
+                    <>
+                      <PenTool className="w-3.5 h-3.5" />
+                      <span>Lưu & Ký duyệt</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

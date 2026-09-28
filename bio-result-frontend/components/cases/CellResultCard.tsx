@@ -18,6 +18,11 @@ import {
 } from 'lucide-react';
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
 import { toast } from '@/components/common/Toast';
+import {
+  fetchDoctorsList,
+  DoctorOption,
+  DEFAULT_DOCTOR_LIST,
+} from '@/lib/doctors';
 
 interface CellResultCardProps {
   caseData: any;
@@ -79,9 +84,20 @@ export default function CellResultCard({
   currentUser,
 }: CellResultCardProps) {
   const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isLab = currentUser?.role === 'lab';
   const [collapsed, setCollapsed] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTOR_LIST);
+
+  React.useEffect(() => {
+    fetchDoctorsList().then((docs) => {
+      if (docs && docs.length > 0) {
+        setDoctorList(docs);
+      }
+    });
+  }, []);
 
   // Check if an option is selected
   const isChecked = (field: string, itemValue: string, itemLabel: string) => {
@@ -99,6 +115,7 @@ export default function CellResultCard({
 
   // Toggle item in array
   const toggleArrayItem = (field: string, itemValue: string) => {
+    if (isLab) return;
     const val = caseData?.[field];
     let list: string[] = [];
     if (Array.isArray(val)) {
@@ -117,6 +134,7 @@ export default function CellResultCard({
 
   // Xóa ảnh khỏi MinIO & CSDL Mongo
   const handleDeleteImage = async (field: string = 'anhTeBao') => {
+    if (isLab) return;
     if (!caseData?._id) {
       onChange(field, '');
       return;
@@ -221,10 +239,17 @@ export default function CellResultCard({
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden space-y-0">
       {/* Card Header */}
-      <div className="p-6 pb-4 flex items-center justify-between border-b border-slate-100">
-        <div className="flex items-center gap-2.5 text-[#0070f3] font-black text-sm uppercase tracking-tight">
-          <Activity className="w-5 h-5 text-[#0070f3]" />
-          <span>{testTitle}</span>
+      <div className="p-6 pb-4 flex items-center justify-between border-b border-slate-100 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5 text-[#0070f3] font-black text-sm uppercase tracking-tight">
+            <Activity className="w-5 h-5 text-[#0070f3]" />
+            <span>{testTitle}</span>
+          </div>
+          {isLab && (
+            <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+              Đơn vị gửi mẫu chỉ xem kết quả
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -251,7 +276,7 @@ export default function CellResultCard({
       </div>
 
       {!collapsed && (
-        <div className="p-6 space-y-6 text-xs text-slate-700">
+        <div className={`p-6 space-y-6 text-xs text-slate-700 ${isLab ? 'pointer-events-none select-none opacity-90' : ''}`}>
           {/* Section 1: TÍNH CHẤT BỆNH PHẨM */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
@@ -486,6 +511,7 @@ export default function CellResultCard({
                 rows={2}
                 value={caseData?.khuyenNghi || ''}
                 onChange={(e) => onChange('khuyenNghi', e.target.value)}
+                placeholder="Để trống sẽ mặc định in 'Không có' trên phiếu..."
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:border-[#0070f3] transition-all"
               />
             </div>
@@ -509,37 +535,39 @@ export default function CellResultCard({
                 />
 
                 {/* 2 Nút bấm riêng biệt: Xóa ảnh & Thay ảnh mới */}
-                <div className="flex items-center justify-center gap-3 pt-1">
-                  <button
-                    type="button"
-                    disabled={isUploadingImage}
-                    onClick={() => handleDeleteImage('anhTeBao')}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Xóa ảnh</span>
-                  </button>
+                {!isLab && (
+                  <div className="flex items-center justify-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      disabled={isUploadingImage}
+                      onClick={() => handleDeleteImage('anhTeBao')}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Xóa ảnh</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    disabled={isUploadingImage}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 text-sky-600 ${isUploadingImage ? 'animate-spin' : ''}`} />
-                    <span>Thay ảnh mới</span>
-                  </button>
+                    <button
+                      type="button"
+                      disabled={isUploadingImage}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 text-sky-600 ${isUploadingImage ? 'animate-spin' : ''}`} />
+                      <span>Thay ảnh mới</span>
+                    </button>
 
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept="image/*"
-                    onChange={(e) => handleUploadOrReplaceImage(e, 'anhTeBao', 'tieuban')}
-                    className="hidden"
-                  />
-                </div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      onChange={(e) => handleUploadOrReplaceImage(e, 'anhTeBao', 'tieuban')}
+                      className="hidden"
+                    />
+                  </div>
+                )}
               </div>
-            ) : (
+            ) : !isLab ? (
               <div className="relative border-2 border-dashed border-sky-200 hover:border-sky-400 bg-sky-50/20 hover:bg-sky-50/50 rounded-2xl p-6 transition-all text-center">
                 <input
                   type="file"
@@ -563,6 +591,10 @@ export default function CellResultCard({
                   </p>
                 </div>
               </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic py-4 text-center bg-slate-50 rounded-xl border border-slate-200">
+                Chưa có ảnh tiêu bản
+              </p>
             )}
           </div>
 
@@ -580,7 +612,7 @@ export default function CellResultCard({
                 </span>
                 <select
                   disabled={!isAdmin}
-                  value={(isCombo ? caseData?.bacSiDoc2 : caseData?.bacSiDoc) || 'BS CK1 PHẠM THẾ HÙNG'}
+                  value={(isCombo ? (caseData?.bacSiDoc2 || caseData?.bacSiDoc) : caseData?.bacSiDoc) || 'BS CK1 PHẠM THẾ HÙNG'}
                   onChange={(e) => onChange(isCombo ? 'bacSiDoc2' : 'bacSiDoc', e.target.value)}
                   className={`form-select text-xs py-1.5 px-3 font-bold rounded-lg border shadow-2xs ${
                     isAdmin
@@ -588,11 +620,11 @@ export default function CellResultCard({
                       : 'text-slate-600 border-slate-200 bg-slate-100 cursor-not-allowed select-none'
                   }`}
                 >
-                  <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
-                  <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
-                  <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
-                  <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
-                  <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
+                  {doctorList.map((doc) => (
+                    <option key={doc.username || doc.fullName} value={doc.fullName}>
+                      {doc.fullName} ({doc.username})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -602,13 +634,16 @@ export default function CellResultCard({
                 </span>
                 <input
                   type="date"
+                  disabled={isLab}
                   value={
                     (isCombo ? caseData?.ngayXetNghiem2 : caseData?.ngayTraKetQua)
                       ? (isCombo ? caseData.ngayXetNghiem2 : caseData.ngayTraKetQua).split('T')[0]
                       : new Date().toISOString().split('T')[0]
                   }
                   onChange={(e) => onChange(isCombo ? 'ngayXetNghiem2' : 'ngayTraKetQua', e.target.value)}
-                  className="text-xs py-1.5 px-3 font-bold text-purple-700 rounded-lg border-purple-300 bg-white shadow-2xs focus:outline-none focus:border-purple-500 cursor-pointer"
+                  className={`text-xs py-1.5 px-3 font-bold rounded-lg border-purple-300 shadow-2xs ${
+                    isLab ? 'bg-slate-100 text-slate-500 cursor-not-allowed select-none' : 'bg-white text-purple-700 cursor-pointer'
+                  }`}
                 />
               </div>
 
@@ -621,41 +656,45 @@ export default function CellResultCard({
             </div>
 
             <div className="flex items-center gap-2 pt-2 sm:pt-0">
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={isSaving}
-                className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isSaving ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Save className="w-3.5 h-3.5" />
-                )}
-                <span>Lưu kết quả Tế bào</span>
-              </button>
+              {!isLab && (
+                <>
+                  <button
+                    type="button"
+                    onClick={onSave}
+                    disabled={isSaving}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Save className="w-3.5 h-3.5" />
+                    )}
+                    <span>Lưu kết quả Tế bào</span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => onToggleSign && onToggleSign(isCombo ? 2 : 1)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
-                  (isCombo ? caseData?.daKy2 : caseData?.daKy)
-                    ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
-              >
-                {(isCombo ? caseData?.daKy2 : caseData?.daKy) ? (
-                  <>
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>{isCombo ? 'Hủy chữ ký P2' : 'Hủy chữ ký'}</span>
-                  </>
-                ) : (
-                  <>
-                    <PenTool className="w-3.5 h-3.5" />
-                    <span>{isCombo ? 'Lưu & Ký duyệt P2 (Tế bào)' : 'Lưu & Ký duyệt'}</span>
-                  </>
-                )}
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => onToggleSign && onToggleSign(isCombo ? 2 : 1)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
+                      (isCombo ? caseData?.daKy2 : caseData?.daKy)
+                        ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    }`}
+                  >
+                    {(isCombo ? caseData?.daKy2 : caseData?.daKy) ? (
+                      <>
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>{isCombo ? 'Hủy chữ ký P2' : 'Hủy chữ ký'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <PenTool className="w-3.5 h-3.5" />
+                        <span>{isCombo ? 'Lưu & Ký duyệt P2 (Tế bào)' : 'Lưu & Ký duyệt'}</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -22,7 +22,7 @@ Hệ thống thiết lập 3 nhóm vai trò chặt chẽ:
 | 1 | `admin_lab` | `210577` | Admin phòng Lab | `admin` | **Toàn quyền hệ thống:** Tạo ca, sửa ca, phân công bác sĩ, duyệt trả kết quả (`da_tra_ket_qua`), xóa phiếu, xem Dashboard tổng thể toàn viện. |
 | 2 | `bacsi_hùng` | `210577` | BS CK1 PHẠM THẾ HÙNG | `doctor` | **Chỉ có quyền đọc & ký KQ:** Xem ca được giao, nhập kết quả test HPV/Cell, ký tên chẩn đoán. **Không được xóa phiếu**. Dashboard tự động lọc chế độ cá nhân. |
 | 3 | `bacsi_đương` | `123456` | TS . BS Nguyễn Khánh Dương | `doctor` | Bác sĩ đọc kết quả (Cell, ThinPrep, GPB, HPV). Không được xóa phiếu. |
-| 4 | `bacsi_trực` | `123456` | BSCK1 . Nguyễn Trung Trực | `doctor` | Bác sĩ đọc kết quả (Khoa Tế bào học). |
+| 4 | `bacsi_truc` / `bacsi_trực` | `123456` | BS CK1 NGUYỄN VĂN TRỰC | `doctor` | Bác sĩ đọc kết quả (Khoa Giải Phẫu Bệnh / Tế bào). |
 | 5 | `bacsi_son` | `123456` | ThS. BSNT Trịnh Ngọc Sơn | `doctor` | Bác sĩ đọc kết quả (Giải phẫu bệnh & HPV). |
 | 6 | `bv_đhqg` | `123456` | Bệnh Viện Đại Học Quốc Gia | `lab` | **Nhập liệu ban đầu:** Tiếp nhận bệnh nhân, tạo phiếu mới, yêu cầu bác sĩ đọc kết quả. Không ký kết quả y khoa. |
 | 7 | `ninhbinh` | `123456` | Bệnh Viện Sản Nhi Ninh Bình | `lab` | Đơn vị gửi mẫu tiếp nhận. |

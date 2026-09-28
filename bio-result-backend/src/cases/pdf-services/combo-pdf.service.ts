@@ -81,10 +81,18 @@ export class ComboPdfService extends BasePdfService {
     const fontR = await pdfDoc.embedFont(fs.readFileSync(fontPath));
     const fontB = await pdfDoc.embedFont(fs.readFileSync(fontBoldPath));
 
+    // Chuyển Mongoose Document sang plain object để không bị mất dữ liệu schema khi spread
+    const rawCase =
+      typeof caseItem.toObject === 'function'
+        ? caseItem.toObject()
+        : caseItem._doc
+        ? { ...caseItem._doc }
+        : { ...caseItem };
+
     // 4. Trang 1 (index = 0): Đổ kết quả HPV pixel-perfect
     await this.hpvPdfService.generatePdf(
       pdfDoc,
-      caseItem,
+      rawCase,
       hpvCat,
       fontR,
       fontB,
@@ -93,15 +101,18 @@ export class ComboPdfService extends BasePdfService {
 
     // 5. Trang 2 (index = 1): Đổ kết quả Cell / ThinPrep pixel-perfect
     const cellCaseItem = {
-      ...caseItem,
-      anhTeBao: caseItem.anhTeBao2 || caseItem.anhTeBao,
+      ...rawCase,
+      anhTeBao: rawCase.anhTeBao2 || rawCase.anhTeBao,
       ketLuan:
-        caseItem.ketLuan2 ||
-        caseItem.ketLuan ||
+        rawCase.ketLuan2 ||
+        rawCase.ketLuan ||
         'KHÔNG THẤY TẾ BÀO BẤT THƯỜNG TRÊN PHIẾN ĐỒ',
-      bacSiDoc: caseItem.bacSiDoc2 || caseItem.bacSiDoc,
-      daKy: caseItem.daKy2 !== undefined ? caseItem.daKy2 : caseItem.daKy,
-      ngayTraKetQua: caseItem.ngayXetNghiem2 || caseItem.ngayTraKetQua,
+      bacSiDoc: rawCase.bacSiDoc2 || rawCase.bacSiDoc,
+      bacSiDoc2: rawCase.bacSiDoc2 || rawCase.bacSiDoc,
+      daKy: rawCase.daKy2 !== undefined ? rawCase.daKy2 : rawCase.daKy,
+      daKy2: rawCase.daKy2 !== undefined ? rawCase.daKy2 : rawCase.daKy,
+      ngayTraKetQua: rawCase.ngayXetNghiem2 || rawCase.ngayTraKetQua,
+      ngayXetNghiem2: rawCase.ngayXetNghiem2 || rawCase.ngayTraKetQua,
     };
     await this.cellPdfService.generatePdf(
       pdfDoc,
@@ -156,15 +167,26 @@ export class ComboPdfService extends BasePdfService {
     }
 
     if (pdfDoc.getPageCount() > 1) {
+      const rawCase =
+        typeof caseItem.toObject === 'function'
+          ? caseItem.toObject()
+          : caseItem._doc
+          ? { ...caseItem._doc }
+          : { ...caseItem };
+
       const cellCaseItem = {
-        ...caseItem,
+        ...rawCase,
+        anhTeBao: rawCase.anhTeBao2 || rawCase.anhTeBao,
         ketLuan:
-          caseItem.ketLuan2 ||
-          caseItem.ketLuan ||
+          rawCase.ketLuan2 ||
+          rawCase.ketLuan ||
           'KHÔNG THẤY TẾ BÀO BẤT THƯỜNG TRÊN PHIẾN ĐỒ',
-        bacSiDoc: caseItem.bacSiDoc2 || caseItem.bacSiDoc,
-        daKy: caseItem.daKy2 !== undefined ? caseItem.daKy2 : caseItem.daKy,
-        ngayTraKetQua: caseItem.ngayXetNghiem2 || caseItem.ngayTraKetQua,
+        bacSiDoc: rawCase.bacSiDoc2 || rawCase.bacSiDoc,
+        bacSiDoc2: rawCase.bacSiDoc2 || rawCase.bacSiDoc,
+        daKy: rawCase.daKy2 !== undefined ? rawCase.daKy2 : rawCase.daKy,
+        daKy2: rawCase.daKy2 !== undefined ? rawCase.daKy2 : rawCase.daKy,
+        ngayTraKetQua: rawCase.ngayXetNghiem2 || rawCase.ngayTraKetQua,
+        ngayXetNghiem2: rawCase.ngayXetNghiem2 || rawCase.ngayTraKetQua,
       };
       await this.cellPdfService.generatePdf(
         pdfDoc,

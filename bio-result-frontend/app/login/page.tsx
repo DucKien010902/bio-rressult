@@ -1,11 +1,20 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Eye, EyeOff, Loader2, AlertCircle, X, Shield, Stethoscope, Building2 } from 'lucide-react';
 
 import { getApiUrl } from '@/lib/config';
+
+interface AccountEntry {
+  _id: string;
+  fullName: string;
+  username: string;
+  passwordHint: string;
+  isActive: boolean;
+  donVi?: string;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +24,34 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [showQuickLoginModal, setShowQuickLoginModal] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // Danh sách tài khoản dynamic từ API
+  const [doctors, setDoctors] = useState<AccountEntry[]>([]);
+  const [sources, setSources] = useState<AccountEntry[]>([]);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+
+  // Fetch accounts khi mở modal
+  useEffect(() => {
+    if (!showQuickLoginModal) return;
+    const fetchAccounts = async () => {
+      setIsLoadingAccounts(true);
+      try {
+        const res = await fetch(getApiUrl('/users/accounts'));
+        if (res.ok) {
+          const data = await res.json();
+          setDoctors(data.doctors || []);
+          setSources(data.sources || []);
+        }
+      } catch (e) {
+        console.error('Lỗi fetch accounts:', e);
+      } finally {
+        setIsLoadingAccounts(false);
+      }
+    };
+    fetchAccounts();
+  }, [showQuickLoginModal]);
+
+  const totalCount = doctors.length + sources.length + 1; // +1 for admin
 
   const handleQuickLogin = (user: string, pass: string) => {
     setUsername(user);
@@ -41,17 +78,15 @@ export default function LoginPage() {
           );
         }
 
-        // Lưu token & thông tin người dùng
         localStorage.setItem('bio_token', data.accessToken);
         localStorage.setItem('bio_user', JSON.stringify(data.user));
 
-        // Chuyển hướng tới trang chính
         router.push('/');
         router.refresh();
       } catch (err: any) {
         setError(
           err.message ||
-            'Không thể kết nối đến máy chủ Backend. Hãy kiểm tra Backend!'
+          'Không thể kết nối đến máy chủ Backend. Hãy kiểm tra Backend!'
         );
       }
     });
@@ -74,8 +109,8 @@ export default function LoginPage() {
         <div className="flex flex-col items-center justify-center mb-6 text-center">
           <div className="flex items-center justify-center mb-2.5">
             <Image
-              src="/logo_gentech.png"
-              alt="Logo Gentech"
+              src="/logo.png"
+              alt="Logo GENHD"
               width={85}
               height={85}
               className="object-contain"
@@ -83,10 +118,10 @@ export default function LoginPage() {
             />
           </div>
           <h1 className="text-2xl font-black text-[#003399] tracking-tight">
-            GENTECH
+            GENHD
           </h1>
           <p className="text-xs text-slate-500 mt-1 font-semibold">
-            Hệ thống Quản lý Kết quả Xét nghiệm GenTech
+            Hệ thống Quản lý Kết quả Xét nghiệm GENHD
           </p>
         </div>
 
@@ -158,38 +193,37 @@ export default function LoginPage() {
         </form>
 
         {/* Nút kích hoạt Modal Tài khoản mẫu */}
-        <div className="mt-6 pt-4 border-t border-slate-100">
+        {/* <div className="mt-6 pt-4 border-t border-slate-100">
           <button
             type="button"
             onClick={() => setShowQuickLoginModal(true)}
             className="w-full py-2.5 px-3.5 rounded-xl border border-dashed border-blue-200 hover:border-blue-400 bg-blue-50/70 hover:bg-blue-100/70 text-[#0070f3] font-bold text-[13px] transition-all flex items-center justify-between cursor-pointer group shadow-2xs"
           >
             <div className="flex items-center gap-2">
-              <span>⚡ Tài khoản mẫu thử nghiệm</span>
-              <span className="text-[11px] bg-[#0070f3] text-white px-2 py-0.5 rounded-full font-bold">8 TK</span>
+              <span>⚡ Tài khoản có sẵn trong hệ thống</span>
             </div>
             <span className="text-xs text-blue-600 font-semibold group-hover:underline flex items-center gap-1">
               Mở danh sách &rarr;
             </span>
           </button>
-        </div>
+        </div> */}
       </div>
 
-      {/* MODAL XEM TÀI KHOẢN MẪU (RỘNG ĐÚNG BẰNG CARD ĐĂNG NHẬP) */}
+      {/* MODAL XEM TÀI KHOẢN */}
       {showQuickLoginModal && (
         <div
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200"
           onClick={() => setShowQuickLoginModal(false)}
         >
           <div
-            className="w-full max-w-[480px] bg-white rounded-[26px] shadow-2xl border border-slate-100 p-6 sm:p-7 relative overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
+            className="w-full max-w-[540px] bg-white rounded-[26px] shadow-2xl border border-slate-100 p-6 sm:p-7 relative overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3.5 border-b border-slate-100 shrink-0">
               <div>
                 <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <span>⚡ TÀI KHOẢN MẪU THỬ NGHIỆM</span>
+                  <span>⚡ TÀI KHOẢN CÓ SẴN TRONG HỆ THỐNG</span>
                 </h2>
                 <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
                   Bấm vào bất kỳ tài khoản nào để đăng nhập tức thì
@@ -207,105 +241,79 @@ export default function LoginPage() {
 
             {/* Modal Body Scrollable */}
             <div className="py-4 space-y-4 overflow-y-auto custom-scrollbar flex-1 pr-1">
-              {/* Nhóm 1: Admin */}
-              <div>
-                <div className="text-[11px] font-bold text-blue-800 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Quản trị phòng Lab (Toàn quyền):</span>
+              {isLoadingAccounts ? (
+                <div className="py-8 flex items-center justify-center gap-2 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin text-[#0070f3]" />
+                  <span className="text-xs font-semibold">Đang tải danh sách tài khoản...</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin('admin_lab', '210577')}
-                  className="w-full p-3 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 transition-all text-left flex items-center justify-between group cursor-pointer"
-                >
+              ) : (
+                <>
+                  {/* Nhóm 1: Admin */}
                   <div>
-                    <div className="font-bold text-blue-900 text-xs sm:text-sm">Admin phòng Lab</div>
-                    <div className="text-[11px] text-blue-600 mt-0.5">user: admin_lab &bull; pass: 210577</div>
+                    <div className="text-[11px] font-bold text-blue-800 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Quản trị phòng Lab (Toàn quyền):</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickLogin('admin_lab', '210577')}
+                      className="w-full p-3 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 transition-all text-left flex items-center justify-between group cursor-pointer"
+                    >
+                      <div>
+                        <div className="font-bold text-blue-900 text-xs sm:text-sm">Admin phòng Lab</div>
+                        <div className="text-[11px] text-blue-600 mt-0.5 font-mono">admin_lab &bull; 210577</div>
+                      </div>
+                      <span className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-bold">Vào ngay &rarr;</span>
+                    </button>
                   </div>
-                  <span className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-bold">Vào ngay &rarr;</span>
-                </button>
-              </div>
 
-              {/* Nhóm 2: Bác sĩ */}
-              <div>
-                <div className="text-[11px] font-bold text-purple-800 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                  <Stethoscope className="w-3.5 h-3.5 text-purple-600" />
-                  <span>Bác sĩ đọc kết quả (Chỉ xem ca của mình):</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('bacsi_hùng', '210577')}
-                    className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 transition-all text-left cursor-pointer"
-                  >
-                    <div className="font-bold text-purple-900 text-xs truncate">BS PHẠM THẾ HÙNG</div>
-                    <div className="text-[11px] text-purple-600 mt-0.5">bacsi_hùng / 210577</div>
-                  </button>
+                  {/* Nhóm 2: Bác sĩ */}
+                  {doctors.length > 0 && (
+                    <div>
+                      <div className="text-[11px] font-bold text-purple-800 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                        <Stethoscope className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Bác sĩ đọc kết quả ({doctors.length} tài khoản):</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {doctors.filter(d => d.isActive !== false).map((doc) => (
+                          <button
+                            key={doc._id}
+                            type="button"
+                            onClick={() => handleQuickLogin(doc.username, doc.passwordHint)}
+                            className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 transition-all text-left cursor-pointer group"
+                          >
+                            <div className="font-bold text-purple-900 text-xs truncate">{doc.fullName}</div>
+                            <div className="text-[11px] text-purple-600 mt-0.5 font-mono">{doc.username} / {doc.passwordHint}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('bacsi_đương', '123456')}
-                    className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 transition-all text-left cursor-pointer"
-                  >
-                    <div className="font-bold text-purple-900 text-xs truncate">BS Nguyễn Khánh Dương</div>
-                    <div className="text-[11px] text-purple-600 mt-0.5">bacsi_đương / 123456</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('bacsi_trực', '123456')}
-                    className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 transition-all text-left cursor-pointer"
-                  >
-                    <div className="font-bold text-purple-900 text-xs truncate">BS Nguyễn Trung Trực</div>
-                    <div className="text-[11px] text-purple-600 mt-0.5">bacsi_trực / 123456</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('bacsi_son', '123456')}
-                    className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/60 hover:bg-purple-100 transition-all text-left cursor-pointer"
-                  >
-                    <div className="font-bold text-purple-900 text-xs truncate">BS Trịnh Ngọc Sơn</div>
-                    <div className="text-[11px] text-purple-600 mt-0.5">bacsi_son / 123456</div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Nhóm 3: Đơn vị gửi mẫu */}
-              <div>
-                <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Đơn vị gửi mẫu (Chỉ xem ca đơn vị mình):</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('bv_đhqg', '123456')}
-                    className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100 transition-all text-left cursor-pointer"
-                  >
-                    <div className="font-bold text-emerald-900 text-xs truncate">BV ĐHQG</div>
-                    <div className="text-[10px] text-emerald-600 mt-0.5">bv_đhqg</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('ninhbinh', '123456')}
-                    className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100 transition-all text-left cursor-pointer"
-                  >
-                    <div className="font-bold text-emerald-900 text-xs truncate">Ninh Bình</div>
-                    <div className="text-[10px] text-emerald-600 mt-0.5">ninhbinh</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('lab 24/7', '123456')}
-                    className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100 transition-all text-left cursor-pointer"
-                  >
-                    <div className="font-bold text-emerald-900 text-xs truncate">Lab 24/7</div>
-                    <div className="text-[10px] text-emerald-600 mt-0.5">lab 24/7</div>
-                  </button>
-                </div>
-              </div>
+                  {/* Nhóm 3: Đơn vị gửi mẫu */}
+                  {sources.length > 0 && (
+                    <div>
+                      <div className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Đơn vị gửi mẫu ({sources.length} tài khoản):</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {sources.filter(s => s.isActive !== false).map((src) => (
+                          <button
+                            key={src._id}
+                            type="button"
+                            onClick={() => handleQuickLogin(src.username, src.passwordHint || '123456')}
+                            className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100 transition-all text-left cursor-pointer"
+                          >
+                            <div className="font-bold text-emerald-900 text-xs truncate">{src.fullName}</div>
+                            <div className="text-[10px] text-emerald-600 mt-0.5 font-mono truncate">{src.username} / {src.passwordHint || '123456'}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -313,4 +321,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

@@ -13,26 +13,76 @@ export class NotificationsService {
     private caseModel: Model<BioCase>,
   ) {}
 
-  async findAll(doctor?: string, role?: string) {
-    // Seed initial notifications if collection is empty
-    const count = await this.notiModel.countDocuments();
-    if (count === 0) {
-      await this.seedDefaultNotifications();
+  async createNotification(data: {
+    title: string;
+    message: string;
+    testResultId?: string;
+    caseCode?: string;
+    patientName?: string;
+    doctorName?: string;
+    sourceName?: string;
+    recipientRole?: 'admin' | 'doctor' | 'source' | 'all';
+    recipientUsername?: string;
+    type?: string;
+  }) {
+    try {
+      return await this.notiModel.create({
+        ...data,
+        isRead: false,
+      });
+    } catch (e) {
+      console.error('[NotificationsService] Error creating notification:', e);
+      return null;
     }
+  }
 
+  async findAll(params: {
+    doctor?: string;
+    role?: string;
+    source?: string;
+    username?: string;
+  } = {}) {
+    const { doctor, role, source, username } = params;
     const query: any = {};
-    if (role === 'doctor' && doctor && doctor.trim() !== '') {
+
+    if (role === 'admin' || username === 'admin') {
+      // Admin sees notifications for admin, for all, or general updates
       query.$or = [
-        { doctorName: new RegExp(doctor.trim(), 'i') },
+        { recipientRole: 'admin' },
         { recipientRole: 'all' },
-        { recipientRole: 'doctor' },
+        { recipientRole: { $exists: false } },
+        { recipientRole: '' },
       ];
+    } else if (role === 'doctor' || role === 'bacsy') {
+      const orList: any[] = [{ recipientRole: 'all' }];
+      if (doctor && doctor.trim()) {
+        orList.push(
+          { doctorName: new RegExp(doctor.trim(), 'i') },
+          { recipientRole: 'doctor', doctorName: new RegExp(doctor.trim(), 'i') },
+        );
+      }
+      if (username && username.trim()) {
+        orList.push({ recipientUsername: username.trim() });
+      }
+      query.$or = orList;
+    } else if (role === 'lab' || role === 'source') {
+      const orList: any[] = [{ recipientRole: 'all' }];
+      if (source && source.trim()) {
+        orList.push(
+          { sourceName: new RegExp(source.trim(), 'i') },
+          { recipientRole: 'source', sourceName: new RegExp(source.trim(), 'i') },
+        );
+      }
+      if (username && username.trim()) {
+        orList.push({ recipientUsername: username.trim() });
+      }
+      query.$or = orList;
     }
 
     const notifications = await this.notiModel
       .find(query)
       .sort({ createdAt: -1 })
-      .limit(30)
+      .limit(50)
       .exec();
 
     const unreadCount = await this.notiModel.countDocuments({
@@ -46,79 +96,81 @@ export class NotificationsService {
     };
   }
 
-  async markRead(notificationId?: string) {
+  async markRead(
+    notificationId?: string,
+    params?: { doctor?: string; role?: string; source?: string; username?: string },
+  ) {
     if (notificationId) {
       await this.notiModel.findByIdAndUpdate(notificationId, {
         $set: { isRead: true },
       });
     } else {
-      await this.notiModel.updateMany({}, { $set: { isRead: true } });
+      // Build filter if user marks all read for their own role
+      const query: any = {};
+      if (params?.role === 'admin') {
+        query.$or = [
+          { recipientRole: 'admin' },
+          { recipientRole: 'all' },
+          { recipientRole: { $exists: false } },
+          { recipientRole: '' },
+        ];
+      } else if (params?.role === 'doctor' && params?.doctor) {
+        query.$or = [
+          { doctorName: new RegExp(params.doctor.trim(), 'i') },
+          { recipientRole: 'all' },
+        ];
+      } else if ((params?.role === 'lab' || params?.role === 'source') && params?.source) {
+        query.$or = [
+          { sourceName: new RegExp(params.source.trim(), 'i') },
+          { recipientRole: 'all' },
+        ];
+      }
+      await this.notiModel.updateMany(query, { $set: { isRead: true } });
     }
     return { success: true };
   }
 
-  private async seedDefaultNotifications() {
-    // Look up some actual cases to link IDs
-    const sampleCases = await this.caseModel.find().limit(6).exec();
+  async deleteOne(id: string) {
+    await this.notiModel.findByIdAndDelete(id);
+    return { success: true };
+  }
 
-    const items = [
-      {
-        title: 'Đã nhận mẫu & phân công: GTHD-CB23TP011',
-        message:
-          'Admin phòng Lab đã nhận mẫu phiếu GTHD-CB23TP011 (NGUYỄN THỊ TÍNH). Bác sĩ đọc: BS CK1 PHẠM THẾ HÙNG',
-        caseCode: 'GTHD-CB23TP011',
-        patientName: 'NGUYỄN THỊ TÍNH',
-        doctorName: 'BS CK1 PHẠM THẾ HÙNG',
-        recipientRole: 'all',
-        isRead: false,
-        testResultId: sampleCases[0]?._id?.toString() || '',
-      },
-      {
-        title: 'Đã nhận mẫu & phân công: GTHD-20HP064',
-        message:
-          'Admin phòng Lab đã nhận mẫu phiếu GTHD-20HP064 (ĐINH THỊ THÚY HẰNG). Bác sĩ đọc: BS CK1 PHẠM THẾ HÙNG',
-        caseCode: 'GTHD-20HP064',
-        patientName: 'ĐINH THỊ THÚY HẰNG',
-        doctorName: 'BS CK1 PHẠM THẾ HÙNG',
-        recipientRole: 'all',
-        isRead: false,
-        testResultId: sampleCases[1]?._id?.toString() || '',
-      },
-      {
-        title: 'Đã nhận mẫu & phân công: GTHD-20HP067',
-        message:
-          'Admin phòng Lab đã nhận mẫu phiếu GTHD-20HP067 (NGUYỄN THỊ BẾN). Bác sĩ đọc: BS CK1 PHẠM THẾ HÙNG',
-        caseCode: 'GTHD-20HP067',
-        patientName: 'NGUYỄN THỊ BẾN',
-        doctorName: 'BS CK1 PHẠM THẾ HÙNG',
-        recipientRole: 'all',
-        isRead: false,
-        testResultId: sampleCases[2]?._id?.toString() || '',
-      },
-      {
-        title: 'Đã hoàn tất kết quả: GTHD-40HP015',
-        message:
-          'Bác sĩ BS CK1 PHẠM THẾ HÙNG đã ký hoàn tất kết quả xét nghiệm cho bệnh nhân VŨ THỊ BÍCH NGỌC.',
-        caseCode: 'GTHD-40HP015',
-        patientName: 'VŨ THỊ BÍCH NGỌC',
-        doctorName: 'BS CK1 PHẠM THẾ HÙNG',
-        recipientRole: 'all',
-        isRead: false,
-        testResultId: sampleCases[3]?._id?.toString() || '',
-      },
-      {
-        title: 'Đã hoàn tất kết quả: GTHD-40HP014',
-        message:
-          'Bác sĩ TS . BS Nguyễn Khánh Dương đã ký hoàn tất kết quả phiếu GTHD-40HP014 (NGUYỄN THỊ THỦY).',
-        caseCode: 'GTHD-40HP014',
-        patientName: 'NGUYỄN THỊ THỦY',
-        doctorName: 'TS . BS Nguyễn Khánh Dương',
-        recipientRole: 'all',
-        isRead: false,
-        testResultId: sampleCases[4]?._id?.toString() || '',
-      },
-    ];
+  async clearAll(params?: {
+    doctor?: string;
+    role?: string;
+    source?: string;
+    username?: string;
+  }) {
+    const query: any = {};
+    if (params?.role === 'admin' || params?.username === 'admin') {
+      // Admin xóa toàn bộ thông báo của hệ thống
+    } else if (params?.role === 'doctor' || params?.role === 'bacsy') {
+      const orList: any[] = [];
+      if (params.doctor && params.doctor.trim()) {
+        orList.push(
+          { doctorName: new RegExp(params.doctor.trim(), 'i') },
+          { recipientRole: 'doctor', doctorName: new RegExp(params.doctor.trim(), 'i') },
+        );
+      }
+      if (params.username && params.username.trim()) {
+        orList.push({ recipientUsername: params.username.trim() });
+      }
+      if (orList.length > 0) query.$or = orList;
+    } else if (params?.role === 'lab' || params?.role === 'source') {
+      const orList: any[] = [];
+      if (params.source && params.source.trim()) {
+        orList.push(
+          { sourceName: new RegExp(params.source.trim(), 'i') },
+          { recipientRole: 'source', sourceName: new RegExp(params.source.trim(), 'i') },
+        );
+      }
+      if (params.username && params.username.trim()) {
+        orList.push({ recipientUsername: params.username.trim() });
+      }
+      if (orList.length > 0) query.$or = orList;
+    }
 
-    await this.notiModel.insertMany(items);
+    await this.notiModel.deleteMany(query);
+    return { success: true };
   }
 }

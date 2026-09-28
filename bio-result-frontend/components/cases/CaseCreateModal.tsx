@@ -43,12 +43,15 @@ export default function CaseCreateModal({
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      const isCombo = activeCategory.startsWith('combo_');
       const payload = {
         ...formData,
         loaiXetNghiem: activeCategory,
         trangThai: 'nhap_thong_tin',
         status: 'pending',
         daKy: false,
+        daKy2: isCombo ? false : undefined,
+        bacSiDoc2: isCombo ? formData.bacSiDoc : '',
         nguoiNhap: currentUser?.fullName || 'Gentech Lab',
         ngayNhanMau: new Date().toISOString().split('T')[0],
       };

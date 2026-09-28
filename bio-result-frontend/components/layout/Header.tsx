@@ -12,6 +12,7 @@ import {
   ExternalLink,
   CheckCircle2,
   Settings,
+  Trash2,
 } from 'lucide-react';
 
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
@@ -31,6 +32,9 @@ interface NotificationItem {
   caseCode?: string;
   patientName?: string;
   doctorName?: string;
+  sourceName?: string;
+  recipientRole?: string;
+  type?: string;
   isRead: boolean;
   createdAt: string;
 }
@@ -53,17 +57,31 @@ export default function Header({
 
   const isDoctor = currentUser?.role === 'doctor' || currentUser?.role === 'bacsy';
   const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isSource = currentUser?.role === 'lab';
+
+  // Build query params based on role
+  const getNotificationParams = () => {
+    const params = new URLSearchParams();
+    if (isAdmin) {
+      params.append('role', 'admin');
+    } else if (isDoctor) {
+      params.append('role', 'doctor');
+      if (currentUser?.fullName) params.append('doctor', currentUser.fullName);
+      if (currentUser?.username) params.append('username', currentUser.username);
+    } else if (isSource) {
+      params.append('role', 'lab');
+      if (currentUser?.donVi) params.append('source', currentUser.donVi);
+      if (currentUser?.fullName) params.append('source', currentUser.fullName);
+      if (currentUser?.username) params.append('username', currentUser.username);
+    }
+    return params.toString();
+  };
 
   // Fetch notifications
   const fetchNotifications = async () => {
     try {
       let url = getApiUrl('/notifications');
-      const params = new URLSearchParams();
-      if (isDoctor && currentUser?.fullName) {
-        params.append('doctor', currentUser.fullName);
-        params.append('role', 'doctor');
-      }
-      const qs = params.toString();
+      const qs = getNotificationParams();
       if (qs) url += `?${qs}`;
 
       const res = await fetch(url, {
@@ -81,6 +99,16 @@ export default function Header({
 
   useEffect(() => {
     fetchNotifications();
+
+    // Auto-polling mỗi 15s để đồng bộ thông báo thời gian thực giữa Nguồn, Admin và Bác sĩ
+    const interval = setInterval(fetchNotifications, 15000);
+    const onFocus = () => fetchNotifications();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [currentUser]);
 
   // Handle outside click for notification & settings dropdowns
@@ -119,7 +147,11 @@ export default function Header({
     setUnreadCount(0);
     setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
     try {
-      await fetch(getApiUrl('/notifications'), {
+      let url = getApiUrl('/notifications');
+      const qs = getNotificationParams();
+      if (qs) url += `?${qs}`;
+
+      await fetch(url, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({}),
@@ -129,6 +161,40 @@ export default function Header({
     }
   };
 
+  const handleClearAllNotifications = async () => {
+    if (!confirm('Bạn có chắc chắn muốn xóa toàn bộ thông báo?')) return;
+    setNotifications([]);
+    setUnreadCount(0);
+    try {
+      let url = getApiUrl('/notifications');
+      const qs = getNotificationParams();
+      if (qs) url += `?${qs}`;
+
+      await fetch(url, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+    } catch (e) {
+      console.error('Clear all notifications error:', e);
+    }
+  };
+
+  const handleDeleteNotification = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const targetItem = notifications.find((item) => item._id === id);
+    setNotifications((prev) => prev.filter((item) => item._id !== id));
+    if (targetItem && !targetItem.isRead) {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
+    try {
+      await fetch(getApiUrl(`/notifications/${id}`), {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+    } catch (e) {
+      console.error('Delete notification error:', e);
+    }
+  };
 
   return (
     <header className="h-[68px] bg-white border-b border-slate-200 px-6 flex items-center justify-between shadow-2xs z-20 shrink-0 select-none">
@@ -164,17 +230,30 @@ export default function Header({
               {/* Header Bar */}
               <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
                 <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  THÔNG BÁO MỚI ({unreadCount})
+                  THÔNG BÁO ({unreadCount})
                 </h3>
-                {unreadCount > 0 && (
-                  <button
-                    onClick={handleMarkAllRead}
-                    className="text-xs text-[#0070f3] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Đọc tất cả</span>
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      className="text-xs text-[#0070f3] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+                      title="Đánh dấu tất cả là đã đọc"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Đọc hết</span>
+                    </button>
+                  )}
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={handleClearAllNotifications}
+                      className="text-xs text-red-500 hover:text-red-600 hover:underline font-semibold flex items-center gap-1 cursor-pointer ml-1"
+                      title="Xóa toàn bộ thông báo"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Xóa hết</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Notification List */}
@@ -196,12 +275,35 @@ export default function Header({
                       <div
                         key={item._id}
                         onClick={() => handleMarkSingleRead(item._id, item.isRead)}
-                        className={`p-3 text-xs transition-colors cursor-pointer hover:bg-slate-50 ${
+                        className={`p-3 text-xs transition-colors cursor-pointer hover:bg-slate-50 relative group ${
                           !item.isRead ? 'bg-sky-50/50 font-medium' : ''
                         }`}
                       >
-                        <div className="flex items-center justify-between text-slate-800 font-bold mb-0.5">
-                          <span className="truncate pr-2 text-xs">{item.title}</span>
+                        <div className="flex items-center justify-between text-slate-800 font-bold mb-1 gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {item.type === 'new_order' || item.title.includes('cần nhận mẫu') ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-amber-100 text-amber-800 shrink-0">
+                                Đơn mới
+                              </span>
+                            ) : item.type === 'sample_accepted' || item.title.includes('tiếp nhận mẫu') ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-blue-100 text-blue-800 shrink-0">
+                                Đã nhận mẫu
+                              </span>
+                            ) : item.type === 'doctor_assigned' || item.title.includes('phân công') || item.title.includes('cần đọc') ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-purple-100 text-purple-800 shrink-0">
+                                Phân công BS
+                              </span>
+                            ) : item.type === 'result_signed' || item.title.includes('đã ký duyệt') ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-teal-100 text-teal-800 shrink-0">
+                                BS đã ký
+                              </span>
+                            ) : item.type === 'result_released' || item.title.includes('kết quả chính thức') ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 shrink-0">
+                                Đã trả KQ
+                              </span>
+                            ) : null}
+                            <span className="truncate text-xs font-bold text-slate-800">{item.title}</span>
+                          </div>
                           <span className="text-[10px] text-slate-400 font-normal shrink-0">
                             {timeStr}
                           </span>
@@ -209,20 +311,31 @@ export default function Header({
                         <p className="text-slate-600 mb-1.5 leading-relaxed text-xs">
                           {item.message}
                         </p>
-                        {item.testResultId && (
-                          <Link
-                            href={`/results/${item.testResultId}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleMarkSingleRead(item._id, item.isRead);
-                              setNotiOpen(false);
-                            }}
-                            className="inline-flex items-center gap-1 text-[#0070f3] hover:underline font-semibold text-xs"
+                        <div className="flex items-center justify-between pt-1">
+                          {item.testResultId ? (
+                            <Link
+                              href={`/results/${item.testResultId}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkSingleRead(item._id, item.isRead);
+                                setNotiOpen(false);
+                              }}
+                              className="inline-flex items-center gap-1 text-[#0070f3] hover:underline font-semibold text-xs"
+                            >
+                              <span>Xem phiếu</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </Link>
+                          ) : (
+                            <span />
+                          )}
+                          <button
+                            onClick={(e) => handleDeleteNotification(item._id, e)}
+                            className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Xóa thông báo này"
                           >
-                            <span>Xem phiếu</span>
-                            <ExternalLink className="w-3 h-3" />
-                          </Link>
-                        )}
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })
@@ -255,21 +368,21 @@ export default function Header({
                 </div>
                 <div className="py-1">
                   <Link
-                    href="/settings"
+                    href="/settings/deadline"
                     onClick={() => setSettingsOpen(false)}
                     className="block px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#0070f3] transition-colors"
                   >
                     Thời gian trả kết quả
                   </Link>
                   <Link
-                    href="/settings?tab=doctors"
+                    href="/settings/doctors"
                     onClick={() => setSettingsOpen(false)}
                     className="block px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#0070f3] transition-colors"
                   >
                     Quản lý Bác sĩ
                   </Link>
                   <Link
-                    href="/settings?tab=sources"
+                    href="/settings/sources"
                     onClick={() => setSettingsOpen(false)}
                     className="block px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#0070f3] transition-colors"
                   >

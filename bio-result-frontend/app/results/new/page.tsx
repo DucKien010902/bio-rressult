@@ -20,6 +20,12 @@ import {
   Building2,
 } from 'lucide-react';
 
+import {
+  fetchDoctorsList,
+  type DoctorOption,
+  DEFAULT_DOCTOR_LIST,
+} from '@/lib/doctors';
+
 // Danh sách các dịch vụ đơn lẻ
 const SINGLE_SERVICES = [
   { id: 'cell', label: 'Cell' },
@@ -38,15 +44,6 @@ const COMBO_SERVICES = [
   { id: 'combo_hpv20_thinprep', label: 'Gói Combo: HPV 20 + ThinPrep' },
   { id: 'combo_hpv40_thinprep', label: 'Gói Combo: HPV 40 + ThinPrep' },
   { id: 'combo_hpv23_thinprep', label: 'Gói Combo: HPV 23 + ThinPrep' },
-];
-
-const DOCTOR_OPTIONS = [
-  'Chưa phân loại',
-  'TS.BS Nguyễn Sỹ Lãnh',
-  'TS . BS NGUYỄN KHÁNH DƯƠNG',
-  'BS CK1 PHẠM THẾ HÙNG',
-  'BS CK1 NGUYỄN VĂN TRỰC',
-  'BS PHẠM THẾ ĐƯƠNG',
 ];
 
 function NewCaseContent() {
@@ -80,18 +77,12 @@ function NewCaseContent() {
   });
 
   // Source selection states (Dành riêng cho Admin nhập thay nguồn)
-  const [sourcesList, setSourcesList] = useState<string[]>([
-    'PK ĐẠI DƯƠNG ĐH',
-    'BVĐK Ngã Tư Hồ',
-    'Phòng khám Medilab',
-    'Phòng Khám Thiên Đức',
-    'Bệnh Viện Phụ Sản Hà Nội',
-    'Bệnh Viện ĐHQG',
-  ]);
+  const [sourcesList, setSourcesList] = useState<string[]>([]);
   const [selectedSourceOption, setSelectedSourceOption] = useState<string>('default');
   const [customSourceName, setCustomSourceName] = useState<string>('');
+  const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTOR_LIST);
 
-  // Check Auth & load sources
+  // Check Auth, load sources & doctors
   useEffect(() => {
     const userStr = localStorage.getItem('bio_user');
     if (!userStr) {
@@ -114,19 +105,17 @@ function NewCaseContent() {
       }
     }
 
-    // Tải danh sách nguồn từ máy chủ
+    // Tải danh sách nguồn từ máy chủ CSDL
     async function fetchSources() {
       try {
-        const res = await fetch(getApiUrl('/cases/sources'), {
+        const res = await fetch(getApiUrl('/users/sources'), {
           headers: getAuthHeaders(),
         });
         if (res.ok) {
           const list = await res.json();
           if (Array.isArray(list) && list.length > 0) {
-            setSourcesList((prev) => {
-              const combined = Array.from(new Set([...prev, ...list]));
-              return combined.filter(Boolean);
-            });
+            const names = list.map((s: any) => s.donVi || s.fullName).filter(Boolean);
+            setSourcesList(Array.from(new Set(names)));
           }
         }
       } catch (err) {
@@ -134,6 +123,13 @@ function NewCaseContent() {
       }
     }
     fetchSources();
+
+    // Tải danh sách bác sĩ thực tế từ tài khoản hệ thống
+    fetchDoctorsList().then((docs) => {
+      if (docs && docs.length > 0) {
+        setDoctorList(docs);
+      }
+    });
   }, [router]);
 
   const handleFieldChange = (field: string, value: any) => {
@@ -213,6 +209,7 @@ function NewCaseContent() {
         effectiveNguoiNhap = currentUser.fullName || currentUser.donVi;
       }
 
+      const isCombo = selectedCategory.startsWith('combo_');
       const payload = {
         ...formData,
         donVi: effectiveDonVi,
@@ -228,7 +225,9 @@ function NewCaseContent() {
         trangThai: 'nhap_thong_tin',
         status: 'nhap_thong_tin',
         daKy: false,
+        daKy2: isCombo ? false : undefined,
         bacSiDoc: formData.bacSiDoc === 'Chưa phân loại' ? '' : formData.bacSiDoc,
+        bacSiDoc2: isCombo ? (formData.bacSiDoc === 'Chưa phân loại' ? '' : formData.bacSiDoc) : '',
       };
 
       const res = await fetch(getApiUrl('/cases'), {
@@ -599,9 +598,10 @@ function NewCaseContent() {
                         : 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed select-none'
                     }`}
                   >
-                    {DOCTOR_OPTIONS.map((doc) => (
-                      <option key={doc} value={doc}>
-                        {doc}
+                    <option value="Chưa phân loại">-- Chưa phân công bác sĩ --</option>
+                    {doctorList.map((doc) => (
+                      <option key={doc.username || doc.fullName} value={doc.fullName}>
+                        {doc.fullName} ({doc.username})
                       </option>
                     ))}
                   </select>

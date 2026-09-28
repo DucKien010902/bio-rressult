@@ -18,6 +18,11 @@ import {
 } from 'lucide-react';
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
 import { toast } from '@/components/common/Toast';
+import {
+  fetchDoctorsList,
+  DoctorOption,
+  DEFAULT_DOCTOR_LIST,
+} from '@/lib/doctors';
 
 interface GiaiphaubenhResultCardProps {
   caseData: any;
@@ -37,12 +42,24 @@ export default function GiaiphaubenhResultCard({
   currentUser,
 }: GiaiphaubenhResultCardProps) {
   const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isLab = currentUser?.role === 'lab';
   const [collapsed, setCollapsed] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTOR_LIST);
+
+  React.useEffect(() => {
+    fetchDoctorsList().then((docs) => {
+      if (docs && docs.length > 0) {
+        setDoctorList(docs);
+      }
+    });
+  }, []);
+
   // Xóa ảnh khỏi MinIO & CSDL Mongo
   const handleDeleteImage = async (field: string = 'anhTeBao') => {
+    if (isLab) return;
     if (!caseData?._id) {
       onChange(field, '');
       return;
@@ -81,6 +98,7 @@ export default function GiaiphaubenhResultCard({
     field: string = 'anhTeBao',
     loaiAnh: string = 'gpb',
   ) => {
+    if (isLab) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -146,6 +164,12 @@ export default function GiaiphaubenhResultCard({
         </div>
 
         <div className="flex items-center gap-3">
+          {isLab && (
+            <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+              Đơn vị gửi mẫu chỉ xem kết quả
+            </span>
+          )}
+
           {caseData?.trangThai === 'da_tra_ket_qua' && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -169,7 +193,7 @@ export default function GiaiphaubenhResultCard({
       </div>
 
       {!collapsed && (
-        <div className="p-6 space-y-6 text-xs text-slate-700">
+        <div className={`p-6 space-y-6 text-xs text-slate-700 ${isLab ? 'pointer-events-none select-none opacity-90' : ''}`}>
           {/* Field 1 & 2: Vị trí bệnh phẩm & Chẩn đoán lâm sàng */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -178,6 +202,7 @@ export default function GiaiphaubenhResultCard({
               </label>
               <input
                 type="text"
+                disabled={isLab}
                 value={caseData?.viTriBenhPham || ''}
                 onChange={(e) => onChange('viTriBenhPham', e.target.value)}
                 placeholder="Cổ tử cung, Niêm mạc tử cung..."
@@ -191,6 +216,7 @@ export default function GiaiphaubenhResultCard({
               </label>
               <input
                 type="text"
+                disabled={isLab}
                 value={caseData?.chanDoanLamSang || ''}
                 onChange={(e) => onChange('chanDoanLamSang', e.target.value)}
                 placeholder="Chẩn đoán từ bác sĩ chỉ định..."
@@ -207,6 +233,7 @@ export default function GiaiphaubenhResultCard({
             </label>
             <textarea
               rows={4}
+              disabled={isLab}
               value={caseData?.daiThe || ''}
               onChange={(e) => onChange('daiThe', e.target.value)}
               placeholder="Nhập mô tả đại thể..."
@@ -222,6 +249,7 @@ export default function GiaiphaubenhResultCard({
             </label>
             <textarea
               rows={5}
+              disabled={isLab}
               value={caseData?.viThe || ''}
               onChange={(e) => onChange('viThe', e.target.value)}
               placeholder="Nhập mô tả vi thể..."
@@ -245,37 +273,39 @@ export default function GiaiphaubenhResultCard({
                 />
 
                 {/* 2 Nút bấm riêng biệt */}
-                <div className="flex items-center justify-center gap-3 pt-1">
-                  <button
-                    type="button"
-                    disabled={isUploadingImage}
-                    onClick={() => handleDeleteImage('anhTeBao')}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                    <span>Xóa ảnh</span>
-                  </button>
+                {!isLab && (
+                  <div className="flex items-center justify-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      disabled={isUploadingImage}
+                      onClick={() => handleDeleteImage('anhTeBao')}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Xóa ảnh</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    disabled={isUploadingImage}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 text-amber-600 ${isUploadingImage ? 'animate-spin' : ''}`} />
-                    <span>Thay ảnh mới</span>
-                  </button>
+                    <button
+                      type="button"
+                      disabled={isUploadingImage}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 text-amber-600 ${isUploadingImage ? 'animate-spin' : ''}`} />
+                      <span>Thay ảnh mới</span>
+                    </button>
 
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept="image/*"
-                    onChange={(e) => handleUploadOrReplaceImage(e, 'anhTeBao', 'gpb')}
-                    className="hidden"
-                  />
-                </div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      onChange={(e) => handleUploadOrReplaceImage(e, 'anhTeBao', 'gpb')}
+                      className="hidden"
+                    />
+                  </div>
+                )}
               </div>
-            ) : (
+            ) : !isLab ? (
               <div className="relative border-2 border-dashed border-amber-200 hover:border-amber-400 bg-amber-50/20 hover:bg-amber-50/50 rounded-2xl p-6 transition-all text-center">
                 <input
                   type="file"
@@ -299,6 +329,10 @@ export default function GiaiphaubenhResultCard({
                   </p>
                 </div>
               </div>
+            ) : (
+              <div className="p-4 bg-slate-50 rounded-xl text-center text-xs text-slate-400 italic">
+                Chưa có ảnh tiêu bản
+              </div>
             )}
           </div>
 
@@ -311,6 +345,7 @@ export default function GiaiphaubenhResultCard({
               </label>
               <textarea
                 rows={3}
+                disabled={isLab}
                 value={caseData?.ketLuan || ''}
                 onChange={(e) => onChange('ketLuan', e.target.value)}
                 placeholder="Nhập kết luận giải phẫu bệnh..."
@@ -324,6 +359,7 @@ export default function GiaiphaubenhResultCard({
               </label>
               <textarea
                 rows={2}
+                disabled={isLab}
                 value={caseData?.khuyenNghi || ''}
                 onChange={(e) => onChange('khuyenNghi', e.target.value)}
                 placeholder="Nhập khuyến nghị nếu có..."
@@ -354,11 +390,11 @@ export default function GiaiphaubenhResultCard({
                       : 'text-slate-600 border-slate-200 bg-slate-100 cursor-not-allowed select-none'
                   }`}
                 >
-                  <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
-                  <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
-                  <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
-                  <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
-                  <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
+                  {doctorList.map((doc) => (
+                    <option key={doc.username || doc.fullName} value={doc.fullName}>
+                      {doc.fullName} ({doc.username})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -368,13 +404,18 @@ export default function GiaiphaubenhResultCard({
                 </span>
                 <input
                   type="date"
+                  disabled={isLab}
                   value={
                     caseData?.ngayTraKetQua
                       ? caseData.ngayTraKetQua.split('T')[0]
                       : new Date().toISOString().split('T')[0]
                   }
                   onChange={(e) => onChange('ngayTraKetQua', e.target.value)}
-                  className="text-xs py-1 px-2.5 font-bold text-slate-800 rounded-lg border-amber-300 bg-white shadow-2xs w-44 cursor-pointer"
+                  className={`text-xs py-1 px-2.5 font-bold rounded-lg border shadow-2xs w-44 ${
+                    isLab
+                      ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed select-none'
+                      : 'border-amber-300 bg-white text-slate-800 cursor-pointer'
+                  }`}
                 />
               </div>
 
@@ -386,43 +427,45 @@ export default function GiaiphaubenhResultCard({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-2 sm:pt-0">
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={isSaving}
-                className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isSaving ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Save className="w-3.5 h-3.5" />
-                )}
-                <span>Lưu Giải Phẫu Bệnh</span>
-              </button>
+            {!isLab && (
+              <div className="flex items-center gap-2 pt-2 sm:pt-0">
+                <button
+                  type="button"
+                  onClick={onSave}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isSaving ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5" />
+                  )}
+                  <span>Lưu Giải Phẫu Bệnh</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={onToggleSign}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
-                  caseData?.daKy
-                    ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
-              >
-                {caseData?.daKy ? (
-                  <>
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Hủy chữ ký</span>
-                  </>
-                ) : (
-                  <>
-                    <PenTool className="w-3.5 h-3.5" />
-                    <span>Lưu & Ký duyệt</span>
-                  </>
-                )}
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={onToggleSign}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
+                    caseData?.daKy
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                >
+                  {caseData?.daKy ? (
+                    <>
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Hủy chữ ký</span>
+                    </>
+                  ) : (
+                    <>
+                      <PenTool className="w-3.5 h-3.5" />
+                      <span>Lưu & Ký duyệt</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

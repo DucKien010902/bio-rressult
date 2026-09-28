@@ -34,7 +34,7 @@ export default function LogoutConfirmModal({
           Xác nhận đăng xuất?
         </h3>
         <p className="text-xs text-slate-500 font-medium mb-6 leading-relaxed">
-          Bạn có chắc chắn muốn thoát khỏi phiên làm việc hiện tại trên hệ thống GenTech?
+          Bạn có chắc chắn muốn thoát khỏi phiên làm việc hiện tại trên hệ thống GENHD?
         </p>
 
         {/* Action Buttons */}

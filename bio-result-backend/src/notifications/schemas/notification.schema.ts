@@ -24,7 +24,16 @@ export class Notification {
   doctorName?: string;
 
   @Prop({ default: '' })
-  recipientRole?: string;
+  sourceName?: string;
+
+  @Prop({ default: '' })
+  recipientRole?: string; // 'admin' | 'doctor' | 'source' | 'all'
+
+  @Prop({ default: '' })
+  recipientUsername?: string;
+
+  @Prop({ default: '' })
+  type?: string; // 'new_order' | 'sample_accepted' | 'doctor_assigned' | 'result_signed' | 'result_released'
 
   @Prop({ default: false })
   isRead!: boolean;

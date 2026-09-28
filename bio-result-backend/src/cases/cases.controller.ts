@@ -55,6 +55,15 @@ export class CasesController {
       effectiveDoctor = req.user.fullName || req.user.username;
     }
 
+    console.log('[CasesController.findAll] params:', {
+      status,
+      keyword,
+      category,
+      effectiveDoctor,
+      effectiveDonVi,
+      user: req.user,
+    });
+
     try {
       return await this.casesService.findAll(
         status,
@@ -99,6 +108,46 @@ export class CasesController {
     }
   }
 
+  // Xuất file Excel danh sách ca xét nghiệm (lọc theo dịch vụ, tháng YYYY-MM, trạng thái, v.v.)
+  @Get('export-excel')
+  async exportCasesExcelEndpoint(
+    @Req() req: any,
+    @Query('category') category: string,
+    @Query('month') month: string,
+    @Query('status') status: string,
+    @Query('doctor') doctor: string,
+    @Query('donVi') donVi: string,
+    @Res() res: Response,
+  ) {
+    let effectiveDonVi = donVi;
+    if (req.user?.role === 'lab') {
+      effectiveDonVi = req.user.donVi;
+    }
+    let effectiveDoctor = doctor;
+    if (req.user?.role === 'doctor' || req.user?.role === 'bacsy') {
+      effectiveDoctor = req.user.fullName || req.user.username;
+    }
+
+    const xlsxBuffer = await this.casesService.exportCasesExcel(
+      category,
+      month,
+      status,
+      effectiveDoctor,
+      effectiveDonVi,
+    );
+
+    const cleanCategory = category || 'all';
+    const cleanMonth = month || 'all';
+    const fileName = `Danh_sach_ca_${cleanCategory}_${cleanMonth}.xlsx`;
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    return res.send(xlsxBuffer);
+  }
+
   // Xuất file Excel (CSV UTF-8 BOM) thống kê hoạt động hoặc bác sĩ
   @Get('stats/export-excel')
   async exportExcel(
@@ -130,6 +179,11 @@ export class CasesController {
   @Get('sources')
   async getSources() {
     return this.casesService.getSources();
+  }
+
+  @Get('doctors')
+  async getDoctors() {
+    return this.casesService.getDoctors();
   }
 
   @Get(':id')
@@ -191,12 +245,12 @@ export class CasesController {
     };
   }
 
-  // Xuất / Tải kết quả file PDF động theo thông tin bệnh nhân và mẫu template
   @Get(':id/export-pdf')
   async exportPdf(
     @Req() req: any,
     @Param('id') id: string,
     @Query('template') template: string,
+    @Query('download') download: string,
     @Res() res: Response,
   ) {
     const caseItem = await this.casesService.findOne(id);
@@ -220,9 +274,12 @@ export class CasesController {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
+
+    const disposition = download === '1' || download === 'true' ? 'attachment' : 'inline';
+    const safeMaSo = (caseItem.maSo || id).replace(/[/\\?%*:|"<>]/g, '_');
     res.setHeader(
       'Content-Disposition',
-      `inline; filename="Ket_qua_${caseItem.maSo || id}.pdf"`,
+      `${disposition}; filename="Ket_qua_${safeMaSo}.pdf"`,
     );
     return res.send(pdfBuffer);
   }
@@ -239,28 +296,66 @@ export class CasesController {
       delete data.bacSiDoc2;
       delete data.doctorName;
     }
-    return this.casesService.create(data);
+    return this.casesService.create(data, req.user);
   }
 
   @Put(':id')
   async update(@Req() req: any, @Param('id') id: string, @Body() data: any) {
-    if (req.user?.role === 'lab') {
-      throw new ForbiddenException(
-        'Tài khoản đơn vị không có quyền chỉnh sửa kết quả phiếu!',
-      );
+    const role = req.user?.role;
+    const existing = await this.casesService.findOne(id);
+    if (!existing) {
+      throw new NotFoundException('Không tìm thấy phiếu xét nghiệm');
     }
-    // Chỉ có Admin mới có quyền thay đổi bác sĩ đọc KQ
-    if (req.user?.role !== 'admin') {
-      delete data.bacSiDoc;
-      delete data.bacSiDoc2;
-      delete data.doctorName;
+
+    // 1. Phân quyền cho tài khoản Đơn vị / Nguồn gửi mẫu (lab):
+    // Chỉ được chỉnh sửa thông tin hành chính của bệnh nhân, KHÔNG được sửa kết quả xét nghiệm
+    if (role === 'lab') {
+      if (
+        existing.donVi &&
+        req.user.donVi &&
+        existing.donVi.trim().toLowerCase() !== req.user.donVi.trim().toLowerCase()
+      ) {
+        throw new ForbiddenException(
+          'Bạn chỉ có quyền cập nhật thông tin ca thuộc đơn vị gửi mẫu của mình!',
+        );
+      }
+      if (existing.trangThai === 'da_tra_ket_qua') {
+        throw new ForbiddenException(
+          'Phiếu xét nghiệm đã hoàn thành trả kết quả, không thể chỉnh sửa!',
+        );
+      }
+
+      const allowedLabData: any = {};
+      const labFields = [
+        'hoTen',
+        'patientName',
+        'namSinh',
+        'gioiTinh',
+        'gender',
+        'diaChi',
+        'address',
+        'soDienThoai',
+        'phone',
+        'bacSiChiDinh',
+        'loaiMau',
+        'ngayNhanMau',
+      ];
+      for (const key of labFields) {
+        if (data[key] !== undefined) {
+          allowedLabData[key] = data[key];
+        }
+      }
+      if (allowedLabData.hoTen) {
+        allowedLabData.hoTen = allowedLabData.hoTen.trim().toUpperCase();
+        allowedLabData.patientName = allowedLabData.hoTen;
+      }
+      return this.casesService.update(id, allowedLabData);
     }
-    if (
-      (req.user?.role === 'doctor' || req.user?.role === 'bacsy') &&
-      req.user.fullName
-    ) {
-      const existing = await this.casesService.findOne(id);
-      if (existing) {
+
+    // 2. Phân quyền cho tài khoản Bác sĩ (doctor / bacsy):
+    // Được chỉnh sửa kết quả xét nghiệm chuyên môn, KHÔNG được sửa thông tin cá nhân của bệnh nhân
+    if (role === 'doctor' || role === 'bacsy') {
+      if (req.user.fullName) {
         const docName = req.user.fullName.trim();
         const isAssigned =
           (existing.bacSiDoc && existing.bacSiDoc.includes(docName)) ||
@@ -272,7 +367,40 @@ export class CasesController {
           );
         }
       }
+
+      // Xóa bỏ toàn bộ các trường thông tin hành chính bệnh nhân nếu gửi lên
+      const patientFields = [
+        'hoTen',
+        'patientName',
+        'namSinh',
+        'gioiTinh',
+        'gender',
+        'diaChi',
+        'address',
+        'soDienThoai',
+        'phone',
+        'donVi',
+        'bacSiChiDinh',
+        'loaiMau',
+        'ngayNhanMau',
+        'maSo',
+        'patientCode',
+      ];
+      for (const key of patientFields) {
+        delete data[key];
+      }
     }
+
+    // 3. Chỉ có Admin mới có quyền thay đổi bác sĩ đọc KQ và xác nhận trả kết quả
+    if (role !== 'admin') {
+      delete data.bacSiDoc;
+      delete data.bacSiDoc2;
+      delete data.doctorName;
+      if (data.trangThai === 'da_tra_ket_qua') {
+        delete data.trangThai;
+      }
+    }
+
     return this.casesService.update(id, data);
   }
 
@@ -312,12 +440,12 @@ export class CasesController {
     return this.casesService.signAndDiagnose(id, body);
   }
 
-  // Admin duyệt và Trả kết quả (da_tra_ket_qua)
+  // Admin duyệt và Trả kết quả (da_tra_ket_qua) sau khi Bác sĩ đã ký
   @Patch(':id/release')
   async releaseResult(@Req() req: any, @Param('id') id: string) {
-    if (req.user?.role === 'lab') {
+    if (req.user?.role !== 'admin' && req.user?.username !== 'admin') {
       throw new ForbiddenException(
-        'Tài khoản đơn vị không có quyền duyệt trả kết quả!',
+        'Chỉ tài khoản Quản trị (Admin) mới có quyền xác nhận trả kết quả!',
       );
     }
     return this.casesService.releaseResult(id);

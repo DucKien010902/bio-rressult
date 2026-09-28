@@ -1,11 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PDFDocument, PDFFont, rgb } from 'pdf-lib';
 import { BasePdfService } from './base-pdf.service.js';
 import { MinioService } from '../../minio/minio.service.js';
+import { UsersService } from '../../users/users.service.js';
 
 @Injectable()
 export class SoituoiPdfService extends BasePdfService {
-  constructor(private minioService: MinioService) {
+  constructor(
+    private minioService: MinioService,
+    private usersService: UsersService,
+  ) {
     super();
   }
   /**
@@ -164,6 +170,101 @@ export class SoituoiPdfService extends BasePdfService {
       },
     ];
 
+    // Helper vẽ ghi chú trong ô bảng: tự động ngắt dòng tối đa 2 dòng, tự co cỡ chữ nếu dài, căn giữa ô
+    const drawCellNote = (text: any, minX: number, maxX: number, centerY: number) => {
+      if (text === undefined || text === null || text === '') return;
+      const maxW = maxX - minX - 4;
+      const words = String(text).trim().split(/\s+/);
+      if (!words.length || !words[0]) return;
+
+      let chosenLines: string[] = [];
+      let chosenSize = 8.0;
+
+      if (fontR.widthOfTextAtSize(String(text), 8.0) <= maxW) {
+        chosenLines = [String(text)];
+        chosenSize = 8.0;
+      } else {
+        let found = false;
+        for (let s = 8.0; s >= 6.0; s -= 0.5) {
+          let l1 = '';
+          let l2 = '';
+          let idx = 0;
+          while (idx < words.length) {
+            const test = l1 ? l1 + ' ' + words[idx] : words[idx];
+            if (fontR.widthOfTextAtSize(test, s) <= maxW) {
+              l1 = test;
+              idx++;
+            } else break;
+          }
+          while (idx < words.length) {
+            const test = l2 ? l2 + ' ' + words[idx] : words[idx];
+            if (fontR.widthOfTextAtSize(test, s) <= maxW) {
+              l2 = test;
+              idx++;
+            } else break;
+          }
+          if (idx === words.length) {
+            chosenLines = [l1, l2].filter(Boolean);
+            chosenSize = s;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          chosenSize = 6.0;
+          let l1 = '';
+          let idx = 0;
+          while (idx < words.length) {
+            const test = l1 ? l1 + ' ' + words[idx] : words[idx];
+            if (fontR.widthOfTextAtSize(test, chosenSize) <= maxW) {
+              l1 = test;
+              idx++;
+            } else break;
+          }
+          let l2 = '';
+          while (idx < words.length) {
+            const test = l2 ? l2 + ' ' + words[idx] : words[idx];
+            if (fontR.widthOfTextAtSize(test + '...', chosenSize) <= maxW) {
+              l2 = test;
+              idx++;
+            } else {
+              l2 = l2 ? l2 + '...' : words[idx].slice(0, 8) + '...';
+              break;
+            }
+          }
+          chosenLines = [l1, l2].filter(Boolean);
+        }
+      }
+
+      if (chosenLines.length === 1) {
+        const lineW = fontR.widthOfTextAtSize(chosenLines[0], chosenSize);
+        const x = minX + (maxX - minX - lineW) / 2;
+        pg.drawText(chosenLines[0], {
+          x,
+          y: centerY,
+          size: chosenSize,
+          font: fontR,
+          color: textColor,
+        });
+      } else if (chosenLines.length >= 2) {
+        const lineSpacing = chosenSize + 2.5;
+        const y1 = centerY + lineSpacing / 2;
+        const y2 = centerY - lineSpacing / 2;
+        for (let i = 0; i < 2; i++) {
+          const lineW = fontR.widthOfTextAtSize(chosenLines[i], chosenSize);
+          const x = minX + (maxX - minX - lineW) / 2;
+          const y = i === 0 ? y1 : y2;
+          pg.drawText(chosenLines[i], {
+            x,
+            y,
+            size: chosenSize,
+            font: fontR,
+            color: textColor,
+          });
+        }
+      }
+    };
+
     for (const item of soiItems) {
       if (item.val) {
         drawCentered(item.val, 206.0, 297.5, item.y, {
@@ -173,10 +274,7 @@ export class SoituoiPdfService extends BasePdfService {
         });
       }
       if (item.note) {
-        drawCentered(item.note, 489.5, 560.6, item.y, {
-          size: 8.5,
-          color: textColor,
-        });
+        drawCellNote(item.note, 489.5, 560.6, item.y);
       }
     }
 
@@ -212,46 +310,104 @@ export class SoituoiPdfService extends BasePdfService {
       color: rgb(0.25, 0.3, 0.35),
     });
 
-    // Bác sĩ đọc kết quả: Phôi mẫu đã in sẵn "BS CK1 PHẠM THẾ HÙNG" tại y = 85.9
-    // Chỉ che và in tên mới nếu khác tên mặc định
-    const drName = caseItem.bacSiDoc || 'BS CK1 PHẠM THẾ HÙNG';
-    if (
-      drName &&
-      !drName.toUpperCase().includes('PHẠM THẾ HÙNG') &&
-      drName !== 'Chưa phân loại'
-    ) {
-      pg.drawRectangle({
-        x: 330,
-        y: 65,
-        width: 220,
-        height: 35,
-        color: rgb(1, 1, 1),
-      });
-      drawCentered(drName, 330, 540, 85.9, { bold: true, size: 9.5 });
-      if (caseItem.chucDanhDoc) {
-        drawCentered(caseItem.chucDanhDoc, 330, 540, 74.9, {
-          size: 8.0,
-          color: rgb(0.35, 0.35, 0.35),
-        });
+    // Bác sĩ đọc kết quả & Chữ ký số
+    const drName = (caseItem.bacSiDoc || caseItem.nguoiThucHien || 'BS CK1 PHẠM THẾ HÙNG').trim();
+    let subTitle = (caseItem.chucDanhDoc || '').trim();
+    let signatureUrl = (caseItem.signatureUrl || caseItem.chuKy || caseItem.signatureImage || '').trim();
+
+    if (this.usersService) {
+      try {
+        const docInfo = await this.usersService.getDoctorInfo(drName);
+        if (docInfo) {
+          if (!subTitle && docInfo.title) subTitle = docInfo.title;
+          if (!signatureUrl && docInfo.signatureUrl) signatureUrl = docInfo.signatureUrl;
+        }
+      } catch (e) {}
+    }
+
+    if (!subTitle) {
+      subTitle = '(Chuyên khoa Xét nghiệm - Giải phẫu bệnh lý)';
+    }
+
+    // Che toàn bộ khối tên cũ trên phôi (từ Y=62 đến Y=98, X=330 đến X=540)
+    pg.drawRectangle({
+      x: 330,
+      y: 62,
+      width: 210,
+      height: 38,
+      color: rgb(1, 1, 1),
+    });
+
+    const centerX = 435;
+    drawCentered(drName, centerX - 105, centerX + 105, 85.9, { bold: true, size: 9.5 });
+    drawCentered(subTitle, centerX - 105, centerX + 105, 74.9, {
+      size: 8.0,
+      color: rgb(0.35, 0.35, 0.35),
+    });
+
+    // Chữ ký điện tử / Ảnh chữ ký nếu đã ký
+    const isSigned = !!(caseItem.daKy || caseItem.daKy1 || caseItem.trangThai === 'da_tra_ket_qua');
+    if (isSigned) {
+      let sigBuffer: Buffer | null = null;
+      if (signatureUrl) {
+        try {
+          sigBuffer = await this.minioService.getImageBuffer(signatureUrl);
+        } catch (e) {}
+      }
+
+      if (!sigBuffer) {
+        const slug = drName.toLowerCase();
+        let fallbackName = '';
+        if (slug.includes('lánh') || slug.includes('lanh')) fallbackName = 'bacsi_lanh.png';
+        else if (slug.includes('hùng') || slug.includes('hung')) fallbackName = 'bacsi_hung.png';
+        else if (slug.includes('sơn') || slug.includes('son')) fallbackName = 'bacsi_son.png';
+        else if (slug.includes('dương') || slug.includes('duong')) fallbackName = 'bacsi_duong.png';
+        else if (slug.includes('trực') || slug.includes('truc')) fallbackName = 'bacsi_truc.png';
+
+        if (fallbackName) {
+          const fbPath = path.join(process.cwd(), 'templates', 'signatures', fallbackName);
+          if (fs.existsSync(fbPath)) {
+            sigBuffer = fs.readFileSync(fbPath);
+          }
+        }
+      }
+
+      if (sigBuffer) {
+        try {
+          let embeddedSig;
+          const isPng =
+            sigBuffer.length > 4 &&
+            sigBuffer[0] === 0x89 &&
+            sigBuffer[1] === 0x50 &&
+            sigBuffer[2] === 0x4e &&
+            sigBuffer[3] === 0x47;
+          if (isPng) {
+            embeddedSig = await pdfDoc.embedPng(sigBuffer);
+          } else {
+            embeddedSig = await pdfDoc.embedJpg(sigBuffer);
+          }
+
+          const { width: origW, height: origH } = embeddedSig.size();
+          const targetH = 45;
+          let targetW = (origW / origH) * targetH;
+          if (targetW > 180) targetW = 180;
+
+          const sigX = centerX - targetW / 2;
+          const sigY = 125.0 - targetH / 2;
+
+          pg.drawImage(embeddedSig, {
+            x: sigX,
+            y: sigY,
+            width: targetW,
+            height: targetH,
+          });
+        } catch (e) {}
       }
     }
 
-    // Chữ ký điện tử / Ảnh chữ ký (nếu có)
-    const sigData = caseItem.chuKy || caseItem.signatureImage;
-    if (sigData) {
-      try {
-        const imgBuffer = await this.minioService.getImageBuffer(sigData);
-        if (imgBuffer) {
-          await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
-            x: 380,
-            y: 95,
-            width: 110,
-            height: 55,
-          });
-        }
-      } catch (e) {
-        // bỏ qua nếu ảnh lỗi
-      }
+    // Đóng con dấu đỏ công ty GenHD nếu đã được Admin xác nhận trả kết quả
+    if (caseItem.trangThai === 'da_tra_ket_qua' || caseItem.status === 'diagnosed') {
+      await this.drawOfficialStamp(pdfDoc, pg, centerX, 105);
     }
   }
 }

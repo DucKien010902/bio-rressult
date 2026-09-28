@@ -1,11 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PDFDocument, PDFFont, rgb } from 'pdf-lib';
 import { BasePdfService } from './base-pdf.service.js';
 import { MinioService } from '../../minio/minio.service.js';
+import { UsersService } from '../../users/users.service.js';
 
 @Injectable()
 export class CellPdfService extends BasePdfService {
-  constructor(private minioService: MinioService) {
+  constructor(
+    private minioService: MinioService,
+    private usersService: UsersService,
+  ) {
     super();
   }
   /**
@@ -393,20 +399,23 @@ export class CellPdfService extends BasePdfService {
       caseItem.ketLuan2 ||
       caseItem.ketLuan ||
       'KHÔNG TỔN THƯƠNG TRONG BIỂU MÔ HAY ÁC TÍNH (NILM).';
-    drawCellText(115, 222.3, klText.toUpperCase(), {
+    drawCellText(125, 222.3, klText.toUpperCase(), {
       bold: true,
       size: 8.5,
       color: blueColor,
     });
 
-    if (caseItem.khuyenNghi) {
-      drawCellText(125, 204.6, caseItem.khuyenNghi, {
-        size: 8.5,
-        color: textColor,
-      });
-    }
+    const knText = (caseItem.khuyenNghi && caseItem.khuyenNghi.trim()) ? caseItem.khuyenNghi.trim() : 'Không có';
+    drawCellText(125, 204.6, knText, {
+      size: 8.5,
+      color: textColor,
+    });
 
     // --- 8. NGÀY KÝ & BÁC SĨ ĐỌC KẾT QUẢ ---
+    const docCenterX = 446; // Trục giữa đồng bộ cho toàn bộ khối Bác sĩ đọc kết quả (đẩy sang phải cân đối)
+    const minBoxX = docCenterX - 105;
+    const maxBoxX = docCenterX + 105;
+
     let dStr = 'Hà Nội, ngày ..... tháng ..... năm 202...';
     if (tKq && tKq.includes('/')) {
       const parts = tKq.split('/');
@@ -414,27 +423,143 @@ export class CellPdfService extends BasePdfService {
         dStr = `Hà Nội, ngày ${parts[0]} tháng ${parts[1]} năm ${parts[2]}`;
       }
     }
-    // Che dòng chữ chấm "Hà Nội, ngày ..... tháng ..... năm 202..." tại Y = 155.3
+    // 8.1 Che dòng chữ chấm "Hà Nội, ngày ..... tháng ..... năm 202..." tại Y = 155.3
     pg.drawRectangle({
-      x: 350,
+      x: 340,
       y: 150,
-      width: 175,
-      height: 12,
+      width: 200,
+      height: 14,
       color: rgb(1, 1, 1),
     });
-    drawCentered(dStr, 350, 520, 155.3, { size: 8.5, color: rgb(0.25, 0.3, 0.35) });
+    drawCentered(dStr, minBoxX, maxBoxX, 155.3, {
+      size: 8.5,
+      color: rgb(0.25, 0.3, 0.35),
+    });
 
-    // Bác sĩ đọc kết quả (in đè nếu khác tên mặc định "BS CK1 PHẠM THẾ HÙNG")
-    const drName = pageIndex === 1 ? caseItem.bacSiDoc2 : caseItem.bacSiDoc;
-    if (drName && drName !== 'BS CK1 PHẠM THẾ HÙNG' && drName !== 'Chưa phân loại') {
+    // 8.2 Che dòng "BÁC SĨ ĐỌC KẾT QUẢ" in sẵn trên phôi cũ (tại Y ≈ 140.5) và vẽ lại căn giữa thẳng hàng
+    pg.drawRectangle({
+      x: 360,
+      y: 135,
+      width: 160,
+      height: 16,
+      color: rgb(1, 1, 1),
+    });
+    drawCentered('BÁC SĨ ĐỌC KẾT QUẢ', minBoxX, maxBoxX, 140.5, {
+      bold: true,
+      size: 9.2,
+      color: rgb(0.08, 0.22, 0.42),
+    });
+
+    // 8.3 Bác sĩ đọc kết quả & Chữ ký số
+    const drName =
+      (pageIndex === 1
+        ? caseItem.bacSiDoc2 || caseItem.bacSiDoc
+        : caseItem.bacSiDoc) || 'BS CK1 PHẠM THẾ HÙNG';
+    const isSigned = pageIndex === 1 ? !!(caseItem.daKy2 || caseItem.daKy) : !!caseItem.daKy;
+
+    if (drName && drName !== 'Chưa phân loại') {
+      // Che toàn bộ khối tên cũ trên phôi (từ Y=45 đến Y=78, X=335 đến X=555)
       pg.drawRectangle({
-        x: 340,
-        y: 63.5,
-        width: 200,
-        height: 13,
+        x: 335,
+        y: 45.0,
+        width: 220,
+        height: 33,
         color: rgb(1, 1, 1),
       });
-      drawCentered(drName, 340, 540, 66.0, { bold: true, size: 9.5 });
+
+      // Lấy thông tin chức danh & chữ ký của bác sĩ
+      let subTitle = caseItem.chucDanhDoc;
+      let signatureUrl = caseItem.signatureUrl || caseItem.chuKy;
+
+      if (this.usersService) {
+        try {
+          if (!subTitle) {
+            const docUser = await this.usersService.findByUsername(drName);
+            if (docUser?.title) subTitle = docUser.title;
+            if (docUser?.signatureUrl) signatureUrl = docUser.signatureUrl;
+          }
+          if (!signatureUrl) {
+            signatureUrl = await this.usersService.getDoctorSignature(drName);
+          }
+        } catch (e) {}
+      }
+
+      if (!subTitle) {
+        subTitle = '(Chuyên khoa Xét nghiệm - Giải phẫu bệnh lý)';
+      }
+
+      // 1. Vẽ Tên bác sĩ căn giữa 100% theo trục docCenterX
+      drawCentered(drName, minBoxX, maxBoxX, 66.0, { bold: true, size: 9.5 });
+
+      // 2. Vẽ Chức danh chuyên môn bác sĩ căn giữa 100% theo trục docCenterX
+      drawCentered(subTitle, minBoxX, maxBoxX, 52.0, { size: 8.0, color: rgb(0.35, 0.35, 0.35) });
+
+      // 3. Nếu đã ký duyệt, chèn ảnh chữ ký vào giữa dòng "BÁC SĨ ĐỌC KẾT QUẢ" (Y ≈ 140) và Tên BS (Y = 66)
+      if (isSigned) {
+        let sigBuffer: Buffer | null = null;
+        if (signatureUrl) {
+          try {
+            sigBuffer = await this.minioService.getImageBuffer(signatureUrl);
+          } catch (e) {}
+        }
+
+        // Fallback file cục bộ
+        if (!sigBuffer) {
+          const slug = drName.toLowerCase();
+          let fallbackName = '';
+          if (slug.includes('lánh') || slug.includes('lanh')) fallbackName = 'bacsi_lanh.png';
+          else if (slug.includes('hùng') || slug.includes('hung')) fallbackName = 'bacsi_hung.png';
+          else if (slug.includes('sơn') || slug.includes('son')) fallbackName = 'bacsi_son.png';
+          else if (slug.includes('dương') || slug.includes('duong')) fallbackName = 'bacsi_duong.png';
+          else if (slug.includes('trực') || slug.includes('truc')) fallbackName = 'bacsi_truc.png';
+
+          if (fallbackName) {
+            const fbPath = path.join(process.cwd(), 'templates', 'signatures', fallbackName);
+            if (fs.existsSync(fbPath)) {
+              sigBuffer = fs.readFileSync(fbPath);
+            }
+          }
+        }
+
+        if (sigBuffer) {
+          try {
+            let embeddedSig;
+            const isPng =
+              sigBuffer.length > 4 &&
+              sigBuffer[0] === 0x89 &&
+              sigBuffer[1] === 0x50 &&
+              sigBuffer[2] === 0x4e &&
+              sigBuffer[3] === 0x47;
+            if (isPng) {
+              embeddedSig = await pdfDoc.embedPng(sigBuffer);
+            } else {
+              embeddedSig = await pdfDoc.embedJpg(sigBuffer);
+            }
+
+            const { width: origW, height: origH } = embeddedSig.size();
+            const targetH = 45; // Chiều cao ảnh chữ ký
+            let targetW = (origW / origH) * targetH;
+            if (targetW > 180) targetW = 180;
+
+            const sigX = docCenterX - targetW / 2;
+            const sigY = 106.0 - targetH / 2; // Đặt tại tâm y = 106.0
+
+            pg.drawImage(embeddedSig, {
+              x: sigX,
+              y: sigY,
+              width: targetW,
+              height: targetH,
+            });
+          } catch (e) {
+            console.error('Lỗi nhúng ảnh chữ ký:', e);
+          }
+        }
+      }
+    }
+
+    // Đóng con dấu đỏ công ty GenHD nếu đã được Admin xác nhận trả kết quả
+    if (caseItem.trangThai === 'da_tra_ket_qua' || caseItem.status === 'diagnosed') {
+      await this.drawOfficialStamp(pdfDoc, pg, docCenterX, 106);
     }
 
     // --- 9. Ảnh tiêu bản tế bào (nếu có) ---
@@ -619,17 +744,26 @@ export class CellPdfService extends BasePdfService {
     drawCheck(349.3, 315.1, hasItem('batThuongTuyen', 'carcinomaTaiCho') || hasItem('batThuongTuyen', 'ais'));
     drawCheck(349.3, 297.1, hasItem('batThuongTuyen', 'carcinomaCtc') || hasItem('batThuongTuyen', 'tuyenKhac'));
 
-    // 4. Kết luận & Khuyến nghị
-    drawText(125, 243.2, caseItem.ketLuan || '', { bold: true, size: 8.5, color: blueColor });
-    drawText(145, 223.8, caseItem.khuyenNghi || '', { size: 8.5 });
+    // 4. Kết luận & Khuyến nghị (Nâng Y lên ngang bằng với title in sẵn)
+    const klTextMedilab =
+      caseItem.ketLuan2 ||
+      caseItem.ketLuan ||
+      'KHÔNG THẤY TẾ BÀO BẤT THƯỜNG TRÊN PHIẾN ĐỒ';
+    drawText(125, 245.8, klTextMedilab, { bold: true, size: 8.5, color: blueColor });
+    const knTextAlt = (caseItem.khuyenNghi && caseItem.khuyenNghi.trim()) ? caseItem.khuyenNghi.trim() : 'Không có';
+    drawText(145, 226.5, knTextAlt, { size: 8.5 });
 
     // 5. Ngày ký & Bác sĩ đọc
     const dStr = caseItem.ngayTraKetQua || caseItem.ngayDuKienTra || caseItem.createdAt;
-    let day = '25', month = '09';
+    let day = '25', month = '09', year = '2026';
     if (dStr) {
       try {
         const parts = String(dStr).split('/');
-        if (parts.length >= 2) {
+        if (parts.length >= 3) {
+          day = parts[0].padStart(2, '0');
+          month = parts[1].padStart(2, '0');
+          year = parts[2].trim();
+        } else if (parts.length === 2) {
           day = parts[0].padStart(2, '0');
           month = parts[1].padStart(2, '0');
         } else {
@@ -637,26 +771,155 @@ export class CellPdfService extends BasePdfService {
           if (!isNaN(dObj.getTime())) {
             day = String(dObj.getDate()).padStart(2, '0');
             month = String(dObj.getMonth() + 1).padStart(2, '0');
+            year = String(dObj.getFullYear());
           }
         }
       } catch (e) {}
     }
-    drawText(434.5, 198.0, day, { bold: true, size: 9.0, color: blueColor });
-    drawText(478.0, 198.0, month, { bold: true, size: 9.0, color: blueColor });
+
+    // Nhúng font Times Bold Italic (hoặc Arial nghiêng) để dòng ngày tháng đẹp và to đồng bộ 100%
+    let fontDate = fontR;
+    const fontTimesBiPath = path.join(process.cwd(), 'templates', 'fonts', 'timesbi.ttf');
+    const fontItalicPath = path.join(process.cwd(), 'templates', 'fonts', 'ariali.ttf');
+    if (fs.existsSync(fontTimesBiPath)) {
+      try {
+        fontDate = await pdfDoc.embedFont(fs.readFileSync(fontTimesBiPath));
+      } catch (e) {}
+    } else if (fs.existsSync(fontItalicPath)) {
+      try {
+        fontDate = await pdfDoc.embedFont(fs.readFileSync(fontItalicPath));
+      } catch (e) {}
+    }
+
+    // Che dòng ngày tháng cũ và vẽ lại toàn bộ dòng ngày tháng to đồng bộ, cùng dòng
+    pg.drawRectangle({
+      x: 390,
+      y: 194,
+      width: 165,
+      height: 18,
+      color: rgb(1, 1, 1),
+    });
+    const medilabNavy = rgb(0, 31 / 255, 95 / 255);
+    const fullDate = `Ngày ${day} tháng ${month} năm ${year}`;
+    const dateW = fontDate.widthOfTextAtSize(fullDate, 11.5);
+    // Trục giữa của tiêu đề "Bác sĩ đọc kết quả" trên phôi là X = 479
+    const dateX = 479 - dateW / 2;
+    pg.drawText(fullDate, { x: dateX, y: 198.5, size: 11.5, font: fontDate, color: medilabNavy });
 
     if (caseItem.daKy) {
       const docName = caseItem.bacSiDoc || caseItem.doctorName || 'BS CK1 PHẠM THẾ HÙNG';
+      // Dịch tên bác sĩ căn giữa chính xác với trục của "Bác sĩ đọc kết quả" (X = 479)
       const docW = fontB.widthOfTextAtSize(docName, 9.5);
-      const docX = 400 + (550 - 400 - docW) / 2;
-      drawText(docX, 115, docName, { bold: true, size: 9.5 });
+      const docX = 479 - docW / 2;
+      drawText(docX, 95, docName, { bold: true, size: 9.5 });
 
-      const signText = 'ĐÃ KÝ DUYỆT ĐIỆN TỬ';
-      const signW = fontB.widthOfTextAtSize(signText, 7.5);
-      const signX = 400 + (550 - 400 - signW) / 2;
-      drawText(signX, 130, signText, { bold: true, size: 7.5, color: rgb(0.1, 0.6, 0.3) });
+      // Lấy chức danh chuyên môn và chữ ký số từ tài khoản bác sĩ
+      let subTitle = caseItem.chucDanhDoc;
+      let signatureUrl = caseItem.signatureUrl || caseItem.chuKy;
+
+      if (this.usersService) {
+        try {
+          if (!signatureUrl) {
+            signatureUrl = await this.usersService.getDoctorSignature(docName);
+          }
+          if (!subTitle) {
+            const docUser = await this.usersService.findByUsername(docName);
+            if (docUser?.title) subTitle = docUser.title;
+          }
+        } catch (e) {}
+      }
+
+      if (!subTitle) {
+        subTitle = '(Chuyên khoa Xét nghiệm - Giải phẫu bệnh lý)';
+      }
+
+      // Dòng phụ chú chuyên khoa căn giữa chính xác cùng trục X = 479
+      const subW = fontR.widthOfTextAtSize(subTitle, 8.0);
+      const subX = 479 - subW / 2;
+      drawText(subX, 83, subTitle, { size: 8.0, color: rgb(0.35, 0.35, 0.35) });
+
+      // Vẽ ảnh chữ ký số bác sĩ ra khoảng trống giữa dòng "Bác sĩ đọc kết quả" và "Tên bác sĩ"
+      // Khoảng cách trên dưới: từ đáy tiêu đề (182.5) đến đỉnh tên (104.5) = 78pt
+      // Chiều cao ảnh = 2/3 khoảng cách = 52pt
+      // Tâm dọc = 143.5, tâm ngang = 479 (căn giữa hoàn hảo cả 2 chiều)
+      let sigBuffer: Buffer | null = null;
+      if (signatureUrl) {
+        try {
+          sigBuffer = await this.minioService.getImageBuffer(signatureUrl);
+        } catch (e) {}
+      }
+
+      // Fallback kiểm tra file cục bộ nếu chưa có trên MinIO
+      if (!sigBuffer) {
+        const slug = docName.toLowerCase();
+        let fallbackName = '';
+        if (slug.includes('lánh') || slug.includes('lanh')) fallbackName = 'bacsi_lanh.png';
+        else if (slug.includes('hùng') || slug.includes('hung')) fallbackName = 'bacsi_hung.png';
+        else if (slug.includes('sơn') || slug.includes('son')) fallbackName = 'bacsi_son.png';
+        else if (slug.includes('dương') || slug.includes('duong')) fallbackName = 'bacsi_duong.png';
+        else if (slug.includes('trực') || slug.includes('truc')) fallbackName = 'bacsi_truc.png';
+
+        if (fallbackName) {
+          const fbPath = path.join(process.cwd(), 'templates', 'signatures', fallbackName);
+          if (fs.existsSync(fbPath)) {
+            sigBuffer = fs.readFileSync(fbPath);
+          }
+        }
+      }
+
+      if (sigBuffer) {
+        try {
+          let embeddedSig;
+          const isPng =
+            sigBuffer.length > 4 &&
+            sigBuffer[0] === 0x89 &&
+            sigBuffer[1] === 0x50 &&
+            sigBuffer[2] === 0x4e &&
+            sigBuffer[3] === 0x47;
+          if (isPng) {
+            try {
+              embeddedSig = await pdfDoc.embedPng(sigBuffer);
+            } catch (e1) {
+              embeddedSig = await pdfDoc.embedJpg(sigBuffer);
+            }
+          } else {
+            try {
+              embeddedSig = await pdfDoc.embedJpg(sigBuffer);
+            } catch (e2) {
+              embeddedSig = await pdfDoc.embedPng(sigBuffer);
+            }
+          }
+
+          if (embeddedSig && embeddedSig.width && embeddedSig.height) {
+            const targetH = 52; // Chiều cao bằng 2/3 khoảng cách
+            // Chiều dài phụ thuộc độ dài ảnh mặc định (giữ nguyên tỷ lệ ảnh)
+            let targetW = (embeddedSig.width / embeddedSig.height) * targetH;
+            if (targetW > 145) {
+              targetW = 145; // Giới hạn tối đa để không lấn sang tiêu bản tế bào
+            }
+            // Căn giữa ngang theo trục 479 và căn giữa dọc theo tâm 143.5
+            const sigX = 479 - targetW / 2;
+            const sigY = 143.5 - targetH / 2;
+
+            pg.drawImage(embeddedSig, {
+              x: sigX,
+              y: sigY,
+              width: targetW,
+              height: targetH,
+            });
+          }
+        } catch (err) {
+          console.error('[CellPdfService] Lỗi khi nhúng ảnh chữ ký:', err);
+        }
+      }
     }
 
-    // 6. Ảnh tiêu bản tế bào (nếu có)
+    // Đóng con dấu đỏ công ty GenHD nếu đã được Admin xác nhận trả kết quả
+    if (caseItem.trangThai === 'da_tra_ket_qua' || caseItem.status === 'diagnosed') {
+      await this.drawOfficialStamp(pdfDoc, pg, 479, 143);
+    }
+
+    // 6. Ảnh tiêu bản tế bào (Dịch lên Y=65 để không che dòng chữ chân trang, giữ nguyên tỷ lệ và chiều cao)
     const cellImgSrc = caseItem.anhTeBao || caseItem.anhTieuBan;
     if (cellImgSrc) {
       try {
@@ -664,9 +927,9 @@ export class CellPdfService extends BasePdfService {
         if (imgBuffer) {
           await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
             x: 55,
-            y: 50,
+            y: 65,
             width: 230,
-            height: 130,
+            height: 120,
           });
         }
       } catch (e) {}

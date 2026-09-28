@@ -18,6 +18,11 @@ import {
 } from 'lucide-react';
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
 import { toast } from '@/components/common/Toast';
+import {
+  fetchDoctorsList,
+  DoctorOption,
+  DEFAULT_DOCTOR_LIST,
+} from '@/lib/doctors';
 
 interface HpvResultCardProps {
   caseData: any;
@@ -39,9 +44,20 @@ export default function HpvResultCard({
   currentUser,
 }: HpvResultCardProps) {
   const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isLab = currentUser?.role === 'lab';
   const [collapsed, setCollapsed] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTOR_LIST);
+
+  React.useEffect(() => {
+    fetchDoctorsList().then((docs) => {
+      if (docs && docs.length > 0) {
+        setDoctorList(docs);
+      }
+    });
+  }, []);
 
   const cat = (caseData?.loaiXetNghiem || 'hpv40').toLowerCase();
   const isHpv40 = cat === 'hpv40' || cat === 'combo_hpv40_cell' || cat === 'combo_hpv40_thinprep';
@@ -152,10 +168,17 @@ export default function HpvResultCard({
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden space-y-0">
       {/* Card Header */}
-      <div className="p-6 pb-4 flex items-center justify-between border-b border-slate-100">
-        <div className="flex items-center gap-2 text-indigo-600 font-black text-sm uppercase tracking-tight">
-          <Dna className="w-5 h-5 text-indigo-600" />
-          <span>{testTitle}</span>
+      <div className="p-6 pb-4 flex items-center justify-between border-b border-slate-100 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-indigo-600 font-black text-sm uppercase tracking-tight">
+            <Dna className="w-5 h-5 text-indigo-600" />
+            <span>{testTitle}</span>
+          </div>
+          {isLab && (
+            <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+              Đơn vị gửi mẫu chỉ xem kết quả
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -197,10 +220,13 @@ export default function HpvResultCard({
               </div>
               <input
                 type="text"
+                disabled={isLab}
                 value={caseData?.hpvHighRiskResult || 'Âm tính'}
                 onChange={(e) => onChange('hpvHighRiskResult', e.target.value)}
                 placeholder="Âm tính / Dương tính..."
-                className="w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 bg-red-50/50 font-bold text-xs text-red-700 focus:outline-none focus:border-red-400 text-center"
+                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${
+                  isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
+                }`}
               />
             </div>
 
@@ -218,10 +244,13 @@ export default function HpvResultCard({
               </div>
               <input
                 type="text"
+                disabled={isLab}
                 value={caseData?.hpvHighRiskOtherResult || 'Âm tính'}
                 onChange={(e) => onChange('hpvHighRiskOtherResult', e.target.value)}
                 placeholder="Âm tính / Dương tính..."
-                className="w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 bg-red-50/50 font-bold text-xs text-red-700 focus:outline-none focus:border-red-400 text-center"
+                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${
+                  isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
+                }`}
               />
             </div>
 
@@ -238,10 +267,13 @@ export default function HpvResultCard({
                 </div>
                 <input
                   type="text"
+                  disabled={isLab}
                   value={caseData?.hpvOtherTypesResult || 'Âm tính'}
                   onChange={(e) => onChange('hpvOtherTypesResult', e.target.value)}
                   placeholder="Âm tính / Dương tính..."
-                  className="w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 bg-red-50/50 font-bold text-xs text-red-700 focus:outline-none focus:border-red-400 text-center"
+                  className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${
+                    isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
+                  }`}
                 />
               </div>
             )}
@@ -258,10 +290,13 @@ export default function HpvResultCard({
               </div>
               <input
                 type="text"
+                disabled={isLab}
                 value={caseData?.hpvLowRiskResult || 'Âm tính'}
                 onChange={(e) => onChange('hpvLowRiskResult', e.target.value)}
                 placeholder="Âm tính / Dương tính..."
-                className="w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-sky-200 bg-sky-50/50 font-bold text-xs text-sky-700 focus:outline-none focus:border-sky-400 text-center"
+                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-sky-200 font-bold text-xs text-sky-700 text-center ${
+                  isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-sky-50/50 focus:outline-none focus:border-sky-400'
+                }`}
               />
             </div>
 
@@ -278,10 +313,13 @@ export default function HpvResultCard({
                 </div>
                 <input
                   type="text"
+                  disabled={isLab}
                   value={caseData?.hpvOtherTypesResult || 'Âm tính'}
                   onChange={(e) => onChange('hpvOtherTypesResult', e.target.value)}
                   placeholder="Âm tính / Dương tính..."
-                  className="w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs text-slate-700 focus:outline-none focus:border-slate-400 text-center"
+                  className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-slate-200 font-bold text-xs text-slate-700 text-center ${
+                    isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-white focus:outline-none focus:border-slate-400'
+                  }`}
                 />
               </div>
             )}
@@ -293,13 +331,14 @@ export default function HpvResultCard({
               <input
                 type="checkbox"
                 id="hienBieuDo"
+                disabled={isLab}
                 checked={!!caseData?.hienBieuDo}
                 onChange={(e) => onChange('hienBieuDo', e.target.checked)}
-                className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                className={`w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 ${isLab ? 'cursor-not-allowed' : 'cursor-pointer'}`}
               />
               <label
                 htmlFor="hienBieuDo"
-                className="text-xs font-bold text-indigo-900 cursor-pointer select-none"
+                className={`text-xs font-bold text-indigo-900 select-none ${isLab ? 'cursor-not-allowed text-slate-500' : 'cursor-pointer'}`}
               >
                 Đính kèm / Tải lên biểu đồ HPV (Real-time PCR)
               </label>
@@ -319,55 +358,61 @@ export default function HpvResultCard({
                         alt="Biểu đồ HPV"
                         className="max-h-56 rounded-lg shadow-sm border border-slate-200 object-contain mx-auto bg-white"
                       />
-                      <div className="flex items-center justify-center gap-3 pt-1">
-                        <button
-                          type="button"
-                          disabled={isUploadingImage}
-                          onClick={() => handleDeleteImage('anhHpv')}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                          <span>Xóa ảnh</span>
-                        </button>
+                      {!isLab && (
+                        <div className="flex items-center justify-center gap-3 pt-1">
+                          <button
+                            type="button"
+                            disabled={isUploadingImage}
+                            onClick={() => handleDeleteImage('anhHpv')}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Xóa ảnh</span>
+                          </button>
 
-                        <button
-                          type="button"
-                          disabled={isUploadingImage}
-                          onClick={() => fileInputRef.current?.click()}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
-                        >
-                          <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isUploadingImage ? 'animate-spin' : ''}`} />
-                          <span>Thay ảnh mới</span>
-                        </button>
+                          <button
+                            type="button"
+                            disabled={isUploadingImage}
+                            onClick={() => fileInputRef.current?.click()}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 text-indigo-600 ${isUploadingImage ? 'animate-spin' : ''}`} />
+                            <span>Thay ảnh mới</span>
+                          </button>
 
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          accept="image/*"
-                          onChange={(e) => handleUploadOrReplaceImage(e, 'anhHpv', 'bieudo')}
-                          className="hidden"
-                        />
-                      </div>
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            accept="image/*"
+                            onChange={(e) => handleUploadOrReplaceImage(e, 'anhHpv', 'bieudo')}
+                            className="hidden"
+                          />
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-2">
                       <span className="text-xs italic text-slate-400 block mb-1">
                         [ Khung hiển thị đồ thị tín hiệu huỳnh quang Real-time PCR / Đồ thị điện di ]
                       </span>
-                      <label className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold shadow-2xs cursor-pointer transition-all">
-                        {isUploadingImage ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                        ) : (
-                          <UploadCloud className="w-4 h-4 text-indigo-600" />
-                        )}
-                        <span>{isUploadingImage ? 'Đang tải lên MinIO...' : 'Tải ảnh biểu đồ HPV'}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleUploadOrReplaceImage(e, 'anhHpv', 'bieudo')}
-                          className="hidden"
-                        />
-                      </label>
+                      {!isLab ? (
+                        <label className="flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-xs font-bold shadow-2xs cursor-pointer transition-all">
+                          {isUploadingImage ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                          ) : (
+                            <UploadCloud className="w-4 h-4 text-indigo-600" />
+                          )}
+                          <span>{isUploadingImage ? 'Đang tải lên MinIO...' : 'Tải ảnh biểu đồ HPV'}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleUploadOrReplaceImage(e, 'anhHpv', 'bieudo')}
+                            className="hidden"
+                          />
+                        </label>
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">Chưa có ảnh biểu đồ</span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -383,12 +428,17 @@ export default function HpvResultCard({
               </label>
               <textarea
                 rows={2}
+                disabled={isLab}
                 value={
                   caseData?.ketLuan ||
                   `ÂM TÍNH VỚI VIRUS HPV (${isHpv40 ? '40' : isHpv23 ? '23' : '20'} TYPE TRÊN) TRÊN MẪU NHẬN ĐƯỢC.`
                 }
                 onChange={(e) => onChange('ketLuan', e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/40 text-xs font-bold text-indigo-950 focus:bg-white focus:outline-none focus:border-[#0070f3] transition-all"
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all ${
+                  isLab
+                    ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                    : 'border-indigo-200 bg-indigo-50/40 text-indigo-950 focus:bg-white focus:outline-none focus:border-[#0070f3]'
+                }`}
               />
             </div>
 
@@ -398,9 +448,15 @@ export default function HpvResultCard({
               </label>
               <textarea
                 rows={2}
+                disabled={isLab}
                 value={caseData?.khuyenNghi || ''}
                 onChange={(e) => onChange('khuyenNghi', e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:border-[#0070f3] transition-all"
+                placeholder="Để trống sẽ mặc định in 'Không có' trên phiếu..."
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-medium transition-all ${
+                  isLab
+                    ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
+                    : 'border-slate-200 bg-slate-50/50 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0070f3]'
+                }`}
               />
             </div>
           </div>
@@ -427,11 +483,11 @@ export default function HpvResultCard({
                       : 'text-slate-600 border-slate-200 bg-slate-100 cursor-not-allowed select-none'
                   }`}
                 >
-                  <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
-                  <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
-                  <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
-                  <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
-                  <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
+                  {doctorList.map((doc) => (
+                    <option key={doc.username || doc.fullName} value={doc.fullName}>
+                      {doc.fullName} ({doc.username})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -441,13 +497,16 @@ export default function HpvResultCard({
                 </span>
                 <input
                   type="date"
+                  disabled={isLab}
                   value={
                     caseData?.ngayTraKetQua
                       ? caseData.ngayTraKetQua.split('T')[0]
                       : new Date().toISOString().split('T')[0]
                   }
                   onChange={(e) => onChange('ngayTraKetQua', e.target.value)}
-                  className="text-xs py-1 px-2.5 font-bold text-slate-800 rounded-lg border-indigo-300 bg-white shadow-2xs w-44 cursor-pointer"
+                  className={`text-xs py-1 px-2.5 font-bold rounded-lg border-indigo-300 shadow-2xs w-44 ${
+                    isLab ? 'bg-slate-100 text-slate-500 cursor-not-allowed select-none' : 'bg-white text-slate-800 cursor-pointer'
+                  }`}
                 />
               </div>
 
@@ -460,41 +519,45 @@ export default function HpvResultCard({
             </div>
 
             <div className="flex items-center gap-2 pt-2 sm:pt-0">
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={isSaving}
-                className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isSaving ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Save className="w-3.5 h-3.5" />
-                )}
-                <span>Lưu kết quả HPV</span>
-              </button>
+              {!isLab && (
+                <>
+                  <button
+                    type="button"
+                    onClick={onSave}
+                    disabled={isSaving}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Save className="w-3.5 h-3.5" />
+                    )}
+                    <span>Lưu kết quả HPV</span>
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => onToggleSign && onToggleSign(1)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
-                  caseData?.daKy
-                    ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
-              >
-                {caseData?.daKy ? (
-                  <>
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>{isCombo ? 'Hủy chữ ký P1' : 'Hủy chữ ký'}</span>
-                  </>
-                ) : (
-                  <>
-                    <PenTool className="w-3.5 h-3.5" />
-                    <span>{isCombo ? 'Lưu & Ký duyệt P1 (HPV)' : 'Lưu & Ký duyệt'}</span>
-                  </>
-                )}
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => onToggleSign && onToggleSign(1)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
+                      caseData?.daKy
+                        ? 'bg-amber-500 hover:bg-amber-600 text-white'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    }`}
+                  >
+                    {caseData?.daKy ? (
+                      <>
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>{isCombo ? 'Hủy chữ ký P1' : 'Hủy chữ ký'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <PenTool className="w-3.5 h-3.5" />
+                        <span>{isCombo ? 'Lưu & Ký duyệt P1 (HPV)' : 'Lưu & Ký duyệt'}</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

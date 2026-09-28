@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Setting, SettingDocument } from './schemas/setting.schema.js';
@@ -20,11 +20,26 @@ export const DEFAULT_TURNAROUND_HOURS: Record<string, number> = {
 };
 
 @Injectable()
-export class SettingsService {
+export class SettingsService implements OnModuleInit {
   constructor(
     @InjectModel(Setting.name)
     private readonly settingModel: Model<SettingDocument>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      const existing = await this.settingModel.findOne({ key: 'turnaround_time' });
+      if (!existing) {
+        await this.settingModel.create({
+          key: 'turnaround_time',
+          value: DEFAULT_TURNAROUND_HOURS,
+        });
+        console.log('[SettingsService] Đã tự động khởi tạo dữ liệu turnaround_time vào CSDL MongoDB');
+      }
+    } catch (err) {
+      console.error('[SettingsService] Lỗi khi khởi tạo turnaround_time:', err);
+    }
+  }
 
   async getSetting(key: string): Promise<any> {
     const found = await this.settingModel.findOne({ key }).lean().exec();

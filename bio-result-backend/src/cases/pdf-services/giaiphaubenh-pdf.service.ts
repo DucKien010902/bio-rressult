@@ -1,11 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PDFDocument, PDFFont, rgb } from 'pdf-lib';
 import { BasePdfService } from './base-pdf.service.js';
 import { MinioService } from '../../minio/minio.service.js';
+import { UsersService } from '../../users/users.service.js';
 
 @Injectable()
 export class GiaiphaubenhPdfService extends BasePdfService {
-  constructor(private minioService: MinioService) {
+  constructor(
+    private minioService: MinioService,
+    private usersService: UsersService,
+  ) {
     super();
   }
   /**
@@ -158,23 +164,104 @@ export class GiaiphaubenhPdfService extends BasePdfService {
     });
     drawCentered(dStr, 345, 530, 132.8, { size: 8.5, color: rgb(0.25, 0.3, 0.35) });
 
-    // Tên bác sĩ đọc kết quả (nếu khác tên in sẵn "BS CK1 NGUYỄN TRUNG TRỰC")
-    const drName = caseItem.bacSiDoc || 'BS CK1 NGUYỄN TRUNG TRỰC';
-    if (drName !== 'BS CK1 NGUYỄN TRUNG TRỰC' && drName !== 'Chưa phân loại') {
-      pg.drawRectangle({
-        x: 330,
-        y: 20,
-        width: 220,
-        height: 38,
-        color: rgb(1, 1, 1),
-      });
-      drawCentered(drName, 330, 540, 43.5, { bold: true, size: 9.5 });
-      if (caseItem.chucDanhDoc) {
-        drawCentered(caseItem.chucDanhDoc, 330, 540, 32.4, {
-          size: 8.0,
-          color: rgb(0.35, 0.35, 0.35),
-        });
+    // Bác sĩ đọc kết quả & Chữ ký số
+    const drName = (caseItem.bacSiDoc || caseItem.nguoiThucHien || 'BSCK1 . Nguyễn Trung Trực').trim();
+    let subTitle = (caseItem.chucDanhDoc || '').trim();
+    let signatureUrl = (caseItem.signatureUrl || caseItem.chuKy || caseItem.signatureImage || '').trim();
+
+    if (this.usersService) {
+      try {
+        const docInfo = await this.usersService.getDoctorInfo(drName);
+        if (docInfo) {
+          if (!subTitle && docInfo.title) subTitle = docInfo.title;
+          if (!signatureUrl && docInfo.signatureUrl) signatureUrl = docInfo.signatureUrl;
+        }
+      } catch (e) {}
+    }
+
+    if (!subTitle) {
+      subTitle = '(Bệnh viện K Trung Ương)';
+    }
+
+    // Che toàn bộ khối tên cũ trên phôi (từ Y=20 đến Y=58, X=330 đến X=540)
+    pg.drawRectangle({
+      x: 330,
+      y: 20,
+      width: 210,
+      height: 38,
+      color: rgb(1, 1, 1),
+    });
+
+    const centerX = 435;
+    drawCentered(drName, centerX - 105, centerX + 105, 43.5, { bold: true, size: 9.5 });
+    drawCentered(subTitle, centerX - 105, centerX + 105, 32.4, {
+      size: 8.0,
+      color: rgb(0.35, 0.35, 0.35),
+    });
+
+    // Chữ ký điện tử / Ảnh chữ ký nếu đã ký
+    const isSigned = !!(caseItem.daKy || caseItem.daKy1 || caseItem.trangThai === 'da_tra_ket_qua');
+    if (isSigned) {
+      let sigBuffer: Buffer | null = null;
+      if (signatureUrl) {
+        try {
+          sigBuffer = await this.minioService.getImageBuffer(signatureUrl);
+        } catch (e) {}
       }
+
+      if (!sigBuffer) {
+        const slug = drName.toLowerCase();
+        let fallbackName = '';
+        if (slug.includes('lánh') || slug.includes('lanh')) fallbackName = 'bacsi_lanh.png';
+        else if (slug.includes('hùng') || slug.includes('hung')) fallbackName = 'bacsi_hung.png';
+        else if (slug.includes('sơn') || slug.includes('son')) fallbackName = 'bacsi_son.png';
+        else if (slug.includes('dương') || slug.includes('duong')) fallbackName = 'bacsi_duong.png';
+        else if (slug.includes('trực') || slug.includes('truc')) fallbackName = 'bacsi_truc.png';
+
+        if (fallbackName) {
+          const fbPath = path.join(process.cwd(), 'templates', 'signatures', fallbackName);
+          if (fs.existsSync(fbPath)) {
+            sigBuffer = fs.readFileSync(fbPath);
+          }
+        }
+      }
+
+      if (sigBuffer) {
+        try {
+          let embeddedSig;
+          const isPng =
+            sigBuffer.length > 4 &&
+            sigBuffer[0] === 0x89 &&
+            sigBuffer[1] === 0x50 &&
+            sigBuffer[2] === 0x4e &&
+            sigBuffer[3] === 0x47;
+          if (isPng) {
+            embeddedSig = await pdfDoc.embedPng(sigBuffer);
+          } else {
+            embeddedSig = await pdfDoc.embedJpg(sigBuffer);
+          }
+
+          const { width: origW, height: origH } = embeddedSig.size();
+          const targetH = 45;
+          let targetW = (origW / origH) * targetH;
+          if (targetW > 180) targetW = 180;
+
+          const sigX = centerX - targetW / 2;
+          const sigY = 82.0 - targetH / 2;
+
+          pg.drawImage(embeddedSig, {
+            x: sigX,
+            y: sigY,
+            width: targetW,
+            height: targetH,
+          });
+        } catch (e) {}
+      }
+    }
+
+    // Đóng con dấu đỏ công ty GenHD nếu đã được Admin xác nhận trả kết quả
+    if (caseItem.trangThai === 'da_tra_ket_qua' || caseItem.status === 'diagnosed') {
+      await this.drawOfficialStamp(pdfDoc, pg, centerX, 65);
     }
 
     // --- 5. ẢNH TIÊU BẢN GIẢI PHẪU BỆNH (Góc dưới bên trái, nếu có) ---

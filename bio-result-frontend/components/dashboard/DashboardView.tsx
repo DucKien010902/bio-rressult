@@ -182,7 +182,7 @@ export default function DashboardView({
           <p className="text-xs text-slate-500 font-medium mt-1">
             {isDoctor
               ? `Tổng quan cá nhân chỉ số phiếu xét nghiệm được phân công cho ${doctorName}`
-              : 'Tổng quan chỉ số hoạt động xét nghiệm tế bào & HPV GenTech'}
+              : 'Tổng quan chỉ số hoạt động xét nghiệm tế bào & HPV GENHD'}
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Body, Query } from '@nestjs/common';
+import { Controller, Get, Put, Delete, Param, Body, Query } from '@nestjs/common';
 import { NotificationsService } from './notifications.service.js';
 
 @Controller('notifications')
@@ -9,12 +9,40 @@ export class NotificationsController {
   async findAll(
     @Query('doctor') doctor?: string,
     @Query('role') role?: string,
+    @Query('source') source?: string,
+    @Query('username') username?: string,
   ) {
-    return this.notiService.findAll(doctor, role);
+    return this.notiService.findAll({ doctor, role, source, username });
   }
 
   @Put()
-  async markRead(@Body() body: { notificationId?: string }) {
-    return this.notiService.markRead(body?.notificationId);
+  async markRead(
+    @Body() body: { notificationId?: string },
+    @Query('doctor') doctor?: string,
+    @Query('role') role?: string,
+    @Query('source') source?: string,
+    @Query('username') username?: string,
+  ) {
+    return this.notiService.markRead(body?.notificationId, {
+      doctor,
+      role,
+      source,
+      username,
+    });
+  }
+
+  @Delete(':id')
+  async deleteOne(@Param('id') id: string) {
+    return this.notiService.deleteOne(id);
+  }
+
+  @Delete()
+  async clearAll(
+    @Query('doctor') doctor?: string,
+    @Query('role') role?: string,
+    @Query('source') source?: string,
+    @Query('username') username?: string,
+  ) {
+    return this.notiService.clearAll({ doctor, role, source, username });
   }
 }

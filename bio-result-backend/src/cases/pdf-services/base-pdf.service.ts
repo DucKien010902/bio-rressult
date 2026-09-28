@@ -1,8 +1,59 @@
 import { Injectable } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PDFFont, rgb } from 'pdf-lib';
 
 @Injectable()
 export class BasePdfService {
+  /**
+   * Đóng con dấu đỏ công ty GenHD lên vùng chữ ký bác sĩ
+   * Chỉ thực hiện khi ca đã được Admin xác nhận trả kết quả (trangThai === 'da_tra_ket_qua')
+   * @param pdfDoc Đối tượng PDFDocument
+   * @param pg Trang PDF cần vẽ
+   * @param centerX Trục ngang trung tâm của khối chữ ký
+   * @param centerY Trục dọc trung tâm của khối chữ ký
+   * @param size Đường kính con dấu (mặc định 92pt)
+   */
+  async drawOfficialStamp(
+    pdfDoc: any,
+    pg: any,
+    centerX: number,
+    centerY: number,
+    size = 175,
+  ): Promise<boolean> {
+    try {
+      const stampPath = path.join(process.cwd(), 'templates', 'con_dau_genhd.png');
+      if (!fs.existsSync(stampPath)) {
+        return false;
+      }
+      const buf = fs.readFileSync(stampPath);
+      const embeddedStamp = await pdfDoc.embedPng(buf);
+
+      // Con dấu to hơn (size=175), mép phải đặt sát 592pt để dịch tối đa sang phải
+      let stampX = centerX + 10;
+      if (stampX + size > 592) {
+        stampX = 592 - size;
+      }
+
+      // Hạ trục Y xuống dưới một chút
+      let stampY = centerY - size / 2 - 12;
+      if (stampY < 8) {
+        stampY = 8;
+      }
+
+      pg.drawImage(embeddedStamp, {
+        x: stampX,
+        y: stampY,
+        width: size,
+        height: size,
+        opacity: 0.88,
+      });
+      return true;
+    } catch (e) {
+      console.error('[drawOfficialStamp] Lỗi đóng dấu:', e);
+      return false;
+    }
+  }
   /**
    * Phủ lớp nền trắng (Whiteout) rồi ghi chữ lên trên
    */

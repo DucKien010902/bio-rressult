@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Eye, Download, X, Layers, RefreshCw } from 'lucide-react';
+import { Eye, Download, X, Layers, RefreshCw, Loader2 } from 'lucide-react';
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
+import { downloadCasePdf } from '@/lib/download';
 
 export interface PdfTemplateItem {
   id: string;
@@ -33,6 +34,7 @@ export default function PdfPreviewSection({
   const [selectedTemplate, setSelectedTemplate] = useState<string>(currentTemplate);
   const [loadingTemplates, setLoadingTemplates] = useState<boolean>(true);
   const [refreshKey, setRefreshKey] = useState<number>(Date.now());
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
   // Lấy danh sách các mẫu in có sẵn cho ca này từ Backend
   useEffect(() => {
@@ -80,13 +82,22 @@ export default function PdfPreviewSection({
     }
   };
 
-  const handleDownloadClick = () => {
+  const handleDownloadClick = async () => {
     if (onDownload) {
       onDownload(selectedTemplate);
     } else {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('bio_token') || '' : '';
-      const query = `?template=${encodeURIComponent(selectedTemplate)}&token=${encodeURIComponent(token)}`;
-      window.open(getApiUrl(`/cases/${caseId}/export-pdf${query}`), '_blank');
+      try {
+        setIsDownloading(true);
+        await downloadCasePdf({
+          caseId,
+          templateId: selectedTemplate,
+          patientName,
+        });
+      } catch (err) {
+        console.error('Lỗi khi tải PDF:', err);
+      } finally {
+        setIsDownloading(false);
+      }
     }
   };
 
@@ -145,10 +156,15 @@ export default function PdfPreviewSection({
           <button
             type="button"
             onClick={handleDownloadClick}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer"
+            disabled={isDownloading}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer disabled:opacity-60"
           >
-            <Download className="w-4 h-4" />
-            <span>Tải PDF về máy</span>
+            {isDownloading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span>{isDownloading ? 'Đang tải PDF...' : 'Tải PDF về máy'}</span>
           </button>
 
           {onClose && (

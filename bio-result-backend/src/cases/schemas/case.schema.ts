@@ -284,6 +284,10 @@ export class BioCase extends Document {
 
 export const BioCaseSchema = SchemaFactory.createForClass(BioCase);
 
+BioCaseSchema.index({ createdAt: -1 });
+BioCaseSchema.index({ loaiXetNghiem: 1, createdAt: -1 });
+BioCaseSchema.index({ trangThai: 1, createdAt: -1 });
+
 // Middleware tự động đồng bộ trường cũ và mới trước khi lưu
 BioCaseSchema.pre('save', function () {
   if (!this.patientCode && this.maSo) this.patientCode = this.maSo;

@@ -1,7 +1,23 @@
 'use client';
 
-import React from 'react';
-import { FileText, Save, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  FileText,
+  Save,
+  Loader2,
+  CheckCircle2,
+  FlaskConical,
+  Clock,
+  Send,
+  Eye,
+  Download,
+  RotateCcw,
+} from 'lucide-react';
+import {
+  fetchDoctorsList,
+  type DoctorOption,
+  DEFAULT_DOCTOR_LIST,
+} from '@/lib/doctors';
 
 interface PatientInfoCardProps {
   caseData: any;
@@ -9,6 +25,10 @@ interface PatientInfoCardProps {
   onSave: () => void;
   isSaving?: boolean;
   currentUser?: any;
+  onReleaseResult?: () => void;
+  onDownloadPdf?: () => void;
+  onPreviewPdf?: () => void;
+  isReleasing?: boolean;
 }
 
 export default function PatientInfoCard({
@@ -17,14 +37,51 @@ export default function PatientInfoCard({
   onSave,
   isSaving = false,
   currentUser,
+  onReleaseResult,
+  onDownloadPdf,
+  onPreviewPdf,
+  isReleasing = false,
 }: PatientInfoCardProps) {
   const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isDoctor = currentUser?.role === 'doctor' || currentUser?.role === 'bacsy';
+
+  const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTOR_LIST);
+
+  useEffect(() => {
+    fetchDoctorsList().then((docs) => {
+      if (docs && docs.length > 0) {
+        setDoctorList(docs);
+      }
+    });
+  }, []);
+
+  const inputBaseClass = (disabled: boolean) =>
+    `w-full px-3.5 py-2.5 rounded-xl border transition-all ${
+      disabled
+        ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed select-none'
+        : 'border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3]'
+    }`;
+
+  const nameInputClass = (disabled: boolean) =>
+    `w-full px-3.5 py-2.5 rounded-xl border uppercase transition-all ${
+      disabled
+        ? 'border-slate-200 bg-slate-100 text-slate-600 font-bold cursor-not-allowed select-none'
+        : 'border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-bold focus:outline-none focus:border-[#0070f3]'
+    }`;
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-5">
       {/* Card Header */}
-      <div className="flex items-center gap-2 pb-3 border-b border-slate-100 text-sky-700 font-bold text-base">
-        <FileText className="w-5 h-5 text-sky-600" />
-        <span>Thông tin hành chính bệnh nhân</span>
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
+        <div className="flex items-center gap-2 text-sky-700 font-bold text-base">
+          <FileText className="w-5 h-5 text-sky-600" />
+          <span>Thông tin hành chính bệnh nhân</span>
+        </div>
+        {isDoctor && (
+          <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+            Tài khoản Bác sĩ chỉ xem thông tin hành chính
+          </span>
+        )}
       </div>
 
       {/* Row 1 */}
@@ -35,9 +92,10 @@ export default function PatientInfoCard({
           </label>
           <input
             type="text"
+            disabled={isDoctor}
             value={caseData?.hoTen || ''}
             onChange={(e) => onChange('hoTen', e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-bold uppercase focus:outline-none focus:border-[#0070f3] transition-all"
+            className={nameInputClass(isDoctor)}
             placeholder="NGUYỄN THỊ THỦY"
           />
         </div>
@@ -48,9 +106,10 @@ export default function PatientInfoCard({
           </label>
           <input
             type="number"
+            disabled={isDoctor}
             value={caseData?.namSinh || ''}
             onChange={(e) => onChange('namSinh', parseInt(e.target.value) || 0)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3] transition-all"
+            className={inputBaseClass(isDoctor)}
             placeholder="1992"
           />
         </div>
@@ -60,9 +119,10 @@ export default function PatientInfoCard({
             Giới tính
           </label>
           <select
+            disabled={isDoctor}
             value={caseData?.gioiTinh || 'Nữ'}
             onChange={(e) => onChange('gioiTinh', e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3] transition-all cursor-pointer"
+            className={`${inputBaseClass(isDoctor)} ${!isDoctor ? 'cursor-pointer' : ''}`}
           >
             <option value="Nữ">Nữ</option>
             <option value="Nam">Nam</option>
@@ -76,9 +136,10 @@ export default function PatientInfoCard({
           </label>
           <input
             type="text"
+            disabled={isDoctor}
             value={caseData?.soDienThoai || ''}
             onChange={(e) => onChange('soDienThoai', e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3] transition-all"
+            className={inputBaseClass(isDoctor)}
             placeholder="0978870036"
           />
         </div>
@@ -92,9 +153,10 @@ export default function PatientInfoCard({
           </label>
           <input
             type="text"
+            disabled={isDoctor}
             value={caseData?.diaChi || ''}
             onChange={(e) => onChange('diaChi', e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3] transition-all"
+            className={inputBaseClass(isDoctor)}
             placeholder="Xóm Sơn Đại Bái, Gia Bình, Bắc Ninh"
           />
         </div>
@@ -105,9 +167,10 @@ export default function PatientInfoCard({
           </label>
           <input
             type="text"
+            disabled={isDoctor}
             value={caseData?.loaiMau || 'Dịch phết'}
             onChange={(e) => onChange('loaiMau', e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3] transition-all"
+            className={inputBaseClass(isDoctor)}
             placeholder="Dịch phết"
           />
         </div>
@@ -118,9 +181,10 @@ export default function PatientInfoCard({
           </label>
           <input
             type="text"
+            disabled={isDoctor}
             value={caseData?.donVi || ''}
             onChange={(e) => onChange('donVi', e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3] transition-all"
+            className={inputBaseClass(isDoctor)}
             placeholder="BVĐK Ngã Tư Hồ"
           />
         </div>
@@ -134,9 +198,10 @@ export default function PatientInfoCard({
           </label>
           <input
             type="text"
+            disabled={isDoctor}
             value={caseData?.bacSiChiDinh || ''}
             onChange={(e) => onChange('bacSiChiDinh', e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3] transition-all"
+            className={inputBaseClass(isDoctor)}
             placeholder="Đoàn Xuân Dũng"
           />
         </div>
@@ -147,9 +212,10 @@ export default function PatientInfoCard({
           </label>
           <input
             type="date"
+            disabled={isDoctor}
             value={caseData?.ngayNhanMau ? caseData.ngayNhanMau.split('T')[0] : ''}
             onChange={(e) => onChange('ngayNhanMau', e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3] transition-all cursor-pointer"
+            className={`${inputBaseClass(isDoctor)} ${!isDoctor ? 'cursor-pointer' : ''}`}
           />
         </div>
       </div>
@@ -174,29 +240,31 @@ export default function PatientInfoCard({
               : 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none'
           }`}
         >
-          <option value="TS.BS Nguyễn Sỹ Lãnh">TS.BS Nguyễn Sỹ Lãnh</option>
-          <option value="TS . BS Nguyễn Khánh Dương">TS . BS Nguyễn Khánh Dương</option>
-          <option value="BS CK1 PHẠM THẾ HÙNG">BS CK1 PHẠM THẾ HÙNG</option>
-          <option value="BS CK1 NGUYỄN VĂN TRỰC">BS CK1 NGUYỄN VĂN TRỰC</option>
-          <option value="BS PHẠM THẾ ĐƯƠNG">BS PHẠM THẾ ĐƯƠNG</option>
+          {doctorList.map((doc) => (
+            <option key={doc.username || doc.fullName} value={doc.fullName}>
+              {doc.fullName} ({doc.username})
+            </option>
+          ))}
         </select>
       </div>
 
       {/* Card Action Footer */}
-      <div className="pt-3 border-t border-slate-100 flex justify-end">
-        <button
-          onClick={onSave}
-          disabled={isSaving}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[#0070f3] hover:bg-[#005bb5] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50"
-        >
-          {isSaving ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4" />
-          )}
-          <span>Lưu thông tin phiếu</span>
-        </button>
-      </div>
+      {!isDoctor && (
+        <div className="pt-3 border-t border-slate-100 flex justify-end">
+          <button
+            onClick={onSave}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#0070f3] hover:bg-[#005bb5] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50"
+          >
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>Lưu thông tin phiếu</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

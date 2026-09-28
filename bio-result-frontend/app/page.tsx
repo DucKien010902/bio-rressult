@@ -6,10 +6,11 @@ import Sidebar, { MENU_CATEGORIES } from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import CaseTable, { CaseItem } from '@/components/cases/CaseTable';
 import DashboardView from '@/components/dashboard/DashboardView';
-import { Plus, FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet } from 'lucide-react';
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
 
 import LogoutConfirmModal from '@/components/layout/LogoutConfirmModal';
+import ExportExcelModal from '@/components/cases/ExportExcelModal';
 
 function DashboardContent() {
   const router = useRouter();
@@ -25,6 +26,7 @@ function DashboardContent() {
   // Layout states
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Data states
   const [cases, setCases] = useState<CaseItem[]>([]);
@@ -58,28 +60,39 @@ function DashboardContent() {
   }, [router]);
 
   // Fetch cases from Backend
-  const fetchCases = async () => {
+  const fetchCases = async (signal?: AbortSignal) => {
+    if (activeCategory === 'dashboard') {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(
         getApiUrl(`/cases?category=${activeCategory}`),
         {
           headers: getAuthHeaders(),
+          signal,
         }
       );
       if (res.ok) {
         const data = await res.json();
         setCases(data);
       }
-    } catch (err) {
-      console.error('Error fetching cases:', err);
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('Error fetching cases:', err);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCases();
+    const controller = new AbortController();
+    fetchCases(controller.signal);
+    return () => {
+      controller.abort();
+    };
   }, [activeCategory]);
 
   const handleLogout = () => {
@@ -139,40 +152,22 @@ function DashboardContent() {
                   <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
                     {searchParams?.get('doctor')
                       ? `Phiếu xét nghiệm: ${searchParams.get('doctor')}`
+                      : activeCategory === 'all'
+                      ? 'Tất cả phiếu xét nghiệm'
                       : 'Danh sách phiếu xét nghiệm'}
                   </h1>
                   <p className="text-xs text-slate-500 font-medium mt-1">
                     {searchParams?.get('doctor')
                       ? `Danh sách các phiếu xét nghiệm phụ trách bởi ${searchParams.get('doctor')}`
-                      : `Quản lý workflow xét nghiệm ${activeCategoryObj.label} GenTech`}
+                      : activeCategory === 'all'
+                      ? 'Quản lý toàn bộ danh sách phiếu xét nghiệm các dịch vụ GENHD'
+                      : `Quản lý workflow xét nghiệm ${activeCategoryObj.label} GENHD`}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {/* Chỉ có Admin và tài khoản là nguồn (lab) mới được tạo mẫu */}
-                  {(currentUser?.role === 'admin' || currentUser?.role === 'lab') && (
-                    <button
-                      onClick={() =>
-                        router.push(
-                          activeCategory && activeCategory !== 'dashboard'
-                            ? `/results/new?category=${activeCategory}`
-                            : '/results/new'
-                        )
-                      }
-                      className="flex items-center gap-2 px-4 py-2.5 bg-[#0070f3] hover:bg-[#005bb5] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Thêm mới phiếu</span>
-                    </button>
-                  )}
-
                   <button
-                    onClick={() => {
-                      window.open(
-                        getApiUrl(`/cases/stats/export-excel?type=all`),
-                        '_blank'
-                      );
-                    }}
+                    onClick={() => setShowExportModal(true)}
                     className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
                   >
                     <FileSpreadsheet className="w-4 h-4" />
@@ -218,6 +213,14 @@ function DashboardContent() {
         onClose={() => setShowLogoutModal(false)}
         onConfirm={handleLogout}
       />
+
+      {/* 4. MODAL XUẤT FILE EXCEL DANH SÁCH CA */}
+      <ExportExcelModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        activeCategory={activeCategory}
+        doctorFilter={searchParams?.get('doctor') || ''}
+      />
     </div>
   );
 }
@@ -227,7 +230,7 @@ export default function HomePage() {
     <Suspense
       fallback={
         <div className="h-screen w-full flex items-center justify-center bg-[#f8fafc] text-xs text-slate-400 font-semibold">
-          Đang tải trang quản lý GenTech...
+          Đang tải trang quản lý GENHD...
         </div>
       }
     >
