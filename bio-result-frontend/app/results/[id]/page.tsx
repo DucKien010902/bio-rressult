@@ -48,6 +48,7 @@ export default function CaseDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [pdfRefreshKey, setPdfRefreshKey] = useState<number>(Date.now());
 
   // Unsaved changes tracking states
   const [isDirty, setIsDirty] = useState(false);
@@ -139,6 +140,7 @@ export default function CaseDetailPage() {
         const updated = await res.json();
         setCaseData(updated);
         setIsDirty(false);
+        setPdfRefreshKey(Date.now());
         toast.success('Đã lưu thông tin phiếu xét nghiệm thành công!', 'Lưu thành công');
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -251,6 +253,7 @@ export default function CaseDetailPage() {
         const updated = await res.json();
         setCaseData(updated);
         setIsDirty(false);
+        setPdfRefreshKey(Date.now());
         const signedStatus = isCombo
           ? (part === 2 ? updated.daKy2 : updated.daKy)
           : updated.daKy;
@@ -303,6 +306,7 @@ export default function CaseDetailPage() {
         const updated = await res.json();
         setCaseData(updated);
         setIsDirty(false);
+        setPdfRefreshKey(Date.now());
         if (updated.trangThai === 'da_tra_ket_qua') {
           toast.success('Đã xác nhận trả kết quả xét nghiệm thành công!', 'Trả kết quả thành công');
         } else {
@@ -640,6 +644,7 @@ export default function CaseDetailPage() {
                   caseId={id}
                   patientName={caseData?.hoTen}
                   currentTemplate={caseData?.pdfTemplate}
+                  refreshKey={pdfRefreshKey}
                   onDownload={handleDownloadPdf}
                   onTemplateChange={(tplId) => {
                     setIsDirty(true);

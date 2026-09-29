@@ -17,6 +17,7 @@ interface PdfPreviewSectionProps {
   caseId: string;
   patientName?: string;
   currentTemplate?: string;
+  refreshKey?: number;
   onClose?: () => void;
   onDownload?: (templateId?: string) => void;
   onTemplateChange?: (templateId: string) => void;
@@ -26,6 +27,7 @@ export default function PdfPreviewSection({
   caseId,
   patientName = '',
   currentTemplate = '',
+  refreshKey: externalRefreshKey = 0,
   onClose,
   onDownload,
   onTemplateChange,
@@ -35,6 +37,12 @@ export default function PdfPreviewSection({
   const [loadingTemplates, setLoadingTemplates] = useState<boolean>(true);
   const [refreshKey, setRefreshKey] = useState<number>(Date.now());
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (externalRefreshKey) {
+      setRefreshKey(externalRefreshKey);
+    }
+  }, [externalRefreshKey]);
 
   // Lấy danh sách các mẫu in có sẵn cho ca này từ Backend
   useEffect(() => {
