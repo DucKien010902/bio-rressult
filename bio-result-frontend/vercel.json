@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://bio-rressult.onrender.com/api/:path*"
+    }
+  ]
+}

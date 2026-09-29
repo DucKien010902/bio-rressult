@@ -312,7 +312,68 @@ export class UsersService implements OnModuleInit {
         await source.save();
       }
 
-      console.log('[UsersService] Đồng bộ thành công Bác sĩ, Nguồn & Tài khoản chuẩn!');
+      // 5. TỰ ĐỘNG ĐỒNG BỘ 100% (SELF-HEALING): TẤT CẢ USER ROLE DOCTOR -> DOCTOR MASTER DATA
+      const allDoctorUsers = await this.userModel.find({ role: { $in: ['doctor', 'bacsy'] } }).exec();
+      for (const uDoc of allDoctorUsers) {
+        let doctor = uDoc.doctorId ? await this.doctorModel.findById(uDoc.doctorId) : null;
+        if (!doctor) {
+          doctor = await this.doctorModel.findOne({ code: uDoc.username });
+        }
+        if (!doctor) {
+          doctor = await this.doctorModel.create({
+            code: uDoc.username,
+            fullName: uDoc.fullName || uDoc.username,
+            title: uDoc.title || '',
+            donVi: uDoc.donVi || '',
+            soDienThoai: uDoc.soDienThoai || '',
+            email: uDoc.email || '',
+            signatureUrl: uDoc.signatureUrl || '',
+            allowedCategories: uDoc.allowedCategories || DEFAULT_CATEGORIES,
+            userId: uDoc._id as any,
+          });
+          console.log(`[UsersService] Tự động tạo hồ sơ Bác sĩ '${doctor.fullName}' (${doctor.code}) từ tài khoản User!`);
+        }
+        if (!uDoc.doctorId || String(uDoc.doctorId) !== String(doctor._id)) {
+          uDoc.doctorId = doctor._id as any;
+          await uDoc.save();
+        }
+        if (!doctor.userId || String(doctor.userId) !== String(uDoc._id)) {
+          doctor.userId = uDoc._id as any;
+          await doctor.save();
+        }
+      }
+
+      // 6. TỰ ĐỘNG ĐỒNG BỘ 100% (SELF-HEALING): TẤT CẢ USER ROLE LAB -> SOURCE MASTER DATA
+      const allSourceUsers = await this.userModel.find({ role: 'lab' }).exec();
+      for (const uSrc of allSourceUsers) {
+        let source = uSrc.sourceId ? await this.sourceModel.findById(uSrc.sourceId) : null;
+        if (!source) {
+          source = await this.sourceModel.findOne({ code: uSrc.username });
+        }
+        if (!source) {
+          source = await this.sourceModel.create({
+            code: uSrc.username,
+            fullName: uSrc.fullName || uSrc.username,
+            donVi: uSrc.donVi || uSrc.fullName || uSrc.username,
+            soDienThoai: uSrc.soDienThoai || '',
+            email: uSrc.email || '',
+            diaChi: uSrc.diaChi || '',
+            allowedCategories: uSrc.allowedCategories || DEFAULT_CATEGORIES,
+            userId: uSrc._id as any,
+          });
+          console.log(`[UsersService] Tự động tạo hồ sơ Nguồn/Đơn vị '${source.fullName}' (${source.code}) từ tài khoản User!`);
+        }
+        if (!uSrc.sourceId || String(uSrc.sourceId) !== String(source._id)) {
+          uSrc.sourceId = source._id as any;
+          await uSrc.save();
+        }
+        if (!source.userId || String(source.userId) !== String(uSrc._id)) {
+          source.userId = uSrc._id as any;
+          await source.save();
+        }
+      }
+
+      console.log('[UsersService] Tự động đồng bộ 100% thành công Bác sĩ, Nguồn & Tài khoản trong CSDL!');
     } catch (err) {
       console.error('[UsersService] Lỗi khởi tạo onModuleInit:', err);
     }

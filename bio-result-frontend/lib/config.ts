@@ -1,13 +1,15 @@
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5002/api';
+// Gọi về proxy /api trên cùng domain của frontend (giấu URL backend OnRender)
+export const API_BASE_URL = '/api';
 
 /**
- * Trả về URL API chuẩn chuẩn hóa (không có dấu / ở cuối)
+ * Trả về URL API chuẩn hóa dạng /api/...
  */
 export const getApiUrl = (path: string = '') => {
-  const baseUrl = API_BASE_URL.replace(/\/$/, '');
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  return `${baseUrl}${cleanPath}`;
+  if (cleanPath.startsWith('/api/')) {
+    return cleanPath;
+  }
+  return `/api${cleanPath}`;
 };
 
 /**
