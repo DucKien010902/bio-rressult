@@ -1,11 +1,116 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import ExcelJS from 'exceljs';
 import { BioCase, CaseStatus } from './schemas/case.schema.js';
 import { UsersService } from '../users/users.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+
+export const FIELD_LABELS: Record<string, string> = {
+  hoTen: 'Họ và tên bệnh nhân',
+  patientName: 'Họ và tên bệnh nhân',
+  namSinh: 'Năm sinh',
+  gioiTinh: 'Giới tính',
+  gender: 'Giới tính',
+  diaChi: 'Địa chỉ',
+  address: 'Địa chỉ',
+  soDienThoai: 'Số điện thoại',
+  phone: 'Số điện thoại',
+  donVi: 'Đơn vị gửi mẫu',
+  bacSiChiDinh: 'Bác sĩ chỉ định',
+  loaiMau: 'Loại mẫu xét nghiệm',
+  ngayNhanMau: 'Ngày nhận mẫu',
+  ngayTraKetQua: 'Ngày trả kết quả',
+  ngayDuKienTra: 'Ngày dự kiến trả',
+  trangThai: 'Trạng thái phiếu',
+  status: 'Trạng thái hệ thống',
+  bacSiDoc: 'Bác sĩ đọc kết quả 1',
+  bacSiDoc2: 'Bác sĩ đọc kết quả 2 (Tế bào)',
+  doctorName: 'Bác sĩ đọc kết quả',
+  daKy: 'Chữ ký BS 1',
+  daKy1: 'Chữ ký BS 1',
+  daKy2: 'Chữ ký BS 2',
+  ketLuan: 'Kết luận xét nghiệm',
+  diagnosis: 'Kết luận xét nghiệm',
+  khuyenNghi: 'Khuyến nghị',
+  chanDoanLamSang: 'Chẩn đoán lâm sàng',
+  hpvHighRiskResult: 'KQ HPV Nguy cơ cao (16, 18)',
+  hpvHighRiskOtherResult: 'KQ HPV Nguy cơ cao khác',
+  hpvLowRiskResult: 'KQ HPV Nguy cơ thấp',
+  hpvOtherTypesResult: 'KQ các Type HPV khác',
+  hpvOtherResult: 'KQ các Type HPV khác',
+  chanDoanTeBao: 'Chẩn đoán tế bào',
+  chatLuongMau: 'Chất lượng mẫu',
+  ketQuaSoiTuoi: 'Kết quả soi tươi',
+  hienBieuDo: 'Hiển thị biểu đồ PCR',
+  anhHpv: 'Ảnh biểu đồ PCR',
+  anhTeBao: 'Ảnh tế bào',
+  pdfTemplate: 'Mẫu phôi in kết quả',
+  ghiChu: 'Ghi chú',
+  viTriBenhPham: 'Vị trí bệnh phẩm',
+  tinhChatBenhPham: 'Tính chất bệnh phẩm',
+  daiThe: 'Đại thể',
+  viThe: 'Vi thể',
+  nhanXetDaiThe: 'Nhận xét đại thể',
+  khongTonThuong: 'Không tổn thương',
+  batThuongKhac: 'Bất thường khác',
+  teBaoNoiMac: 'Tế bào nội mạc',
+  bienDoiViSinh: 'Biến đổi vi sinh',
+  bienDoiKhac: 'Biến đổi khác',
+  batThuongVay: 'Bất thường vảy',
+  batThuongTuyen: 'Bất thường tuyến',
+  ketLuan2: 'Kết luận phần 2 (Tế bào)',
+  ngayXetNghiem2: 'Ngày xét nghiệm phần 2',
+};
+
+export function formatHistoryValue(key: string, val: any): string {
+  if (val === null || val === undefined || val === '') return '(Để trống)';
+  if (typeof val === 'boolean') return val ? 'Đã ký duyệt / Bật' : 'Chưa ký / Tắt';
+  if (key === 'trangThai') {
+    if (val === 'nhap_thong_tin') return 'Nhập thông tin';
+    if (val === 'chay_ket_qua') return 'Chạy kết quả';
+    if (val === 'da_tra_ket_qua') return 'Đã trả kết quả';
+  }
+  if (key.startsWith('anh') && typeof val === 'string' && val.length > 50) {
+    return '(Đã tải lên hình ảnh mới)';
+  }
+  if (typeof val === 'object') {
+    try {
+      return JSON.stringify(val);
+    } catch {
+      return String(val);
+    }
+  }
+  return String(val);
+}
+
+export function computeDiff(existing: any, updateData: any) {
+  const ignoredKeys = new Set([
+    '_id', 'id', 'createdAt', 'updatedAt', '__v',
+    'lichSuThaoTac', 'lichSuChinhSua', 'pdfBuffer',
+    'bieuDoHpv', 'signatureImage'
+  ]);
+  const changes: any[] = [];
+
+  for (const [key, newVal] of Object.entries(updateData)) {
+    if (ignoredKeys.has(key)) continue;
+    const oldVal = existing[key];
+
+    const oldStr = formatHistoryValue(key, oldVal);
+    const newStr = formatHistoryValue(key, newVal);
+
+    if (oldStr !== newStr) {
+      changes.push({
+        truong: FIELD_LABELS[key] || key,
+        fieldKey: key,
+        giaTriCu: oldStr,
+        giaTriMoi: newStr,
+      });
+    }
+  }
+  return changes;
+}
 
 @Injectable()
 export class CasesService {
@@ -143,10 +248,36 @@ export class CasesService {
   }
 
   async create(data: Partial<BioCase>, creatorUser?: any): Promise<BioCase> {
+    const now = new Date().toISOString();
+    const creatorName =
+      creatorUser?.fullName || creatorUser?.username || data.nguoiNhap || 'Quản trị viên';
+    const creatorRole = creatorUser?.role || 'admin';
+
+    const initialLog: any = {
+      id: new Types.ObjectId().toString(),
+      nguoiThucHien: creatorName,
+      username: creatorUser?.username || '',
+      vaiTro: creatorRole,
+      thoiGian: now,
+      hanhDong: 'create',
+      moTa: 'Tạo mới phiếu xét nghiệm',
+      chiTiet: [
+        { truong: 'Mã số phiếu', fieldKey: 'maSo', giaTriCu: '', giaTriMoi: data.maSo },
+        { truong: 'Họ và tên bệnh nhân', fieldKey: 'hoTen', giaTriCu: '', giaTriMoi: data.hoTen },
+        { truong: 'Dịch vụ xét nghiệm', fieldKey: 'loaiXetNghiem', giaTriCu: '', giaTriMoi: this.getCategoryLabel(data.loaiXetNghiem) },
+        { truong: 'Đơn vị gửi mẫu', fieldKey: 'donVi', giaTriCu: '', giaTriMoi: data.donVi || 'Trực tiếp' },
+        { truong: 'Trạng thái ban đầu', fieldKey: 'trangThai', giaTriCu: '', giaTriMoi: formatHistoryValue('trangThai', data.trangThai || 'nhap_thong_tin') },
+      ],
+      nguoiSua: creatorName,
+      noiDung: 'Tạo mới phiếu xét nghiệm',
+    };
+
     const newCase = new this.caseModel({
       ...data,
       trangThai: data.trangThai || 'nhap_thong_tin',
       status: data.status || 'pending',
+      lichSuThaoTac: [initialLog],
+      lichSuChinhSua: [initialLog],
     });
     const saved = await newCase.save();
 
@@ -196,7 +327,7 @@ export class CasesService {
     return saved;
   }
 
-  async update(id: string, data: Partial<BioCase>): Promise<BioCase> {
+  async update(id: string, data: Partial<BioCase>, user?: any): Promise<BioCase> {
     const existing = await this.caseModel.findById(id);
     if (!existing) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm để cập nhật');
@@ -206,10 +337,52 @@ export class CasesService {
     delete (cleanData as any)._id;
     delete (cleanData as any).createdAt;
     delete (cleanData as any).updatedAt;
+    delete (cleanData as any).lichSuThaoTac;
+    delete (cleanData as any).lichSuChinhSua;
+
+    // So sánh các trường thay đổi để ghi lại lịch sử thao tác
+    const changes = computeDiff(existing.toObject ? existing.toObject() : existing, cleanData);
+
+    const updateQuery: any = { $set: cleanData };
+
+    if (changes.length > 0) {
+      let hanhDong = 'update';
+      let moTa = `Chỉnh sửa ${changes.length} thông tin phiếu`;
+
+      if (cleanData.daKy === true && !existing.daKy) {
+        hanhDong = 'sign';
+        moTa = `Bác sĩ ${cleanData.bacSiDoc || existing.bacSiDoc || 'Bác sĩ'} ký duyệt kết quả`;
+      } else if (cleanData.daKy2 === true && !existing.daKy2) {
+        hanhDong = 'sign';
+        moTa = `Bác sĩ ${cleanData.bacSiDoc2 || existing.bacSiDoc2 || 'Bác sĩ'} ký duyệt kết quả phần 2`;
+      } else if (cleanData.trangThai && cleanData.trangThai !== existing.trangThai) {
+        hanhDong = 'status_change';
+        moTa = `Chuyển trạng thái phiếu sang "${formatHistoryValue('trangThai', cleanData.trangThai)}"`;
+      }
+
+      const userName = user?.fullName || user?.username || 'Người dùng hệ thống';
+      const logEntry: any = {
+        id: new Types.ObjectId().toString(),
+        nguoiThucHien: userName,
+        username: user?.username || '',
+        vaiTro: user?.role || '',
+        thoiGian: new Date().toISOString(),
+        hanhDong,
+        moTa,
+        chiTiet: changes,
+        nguoiSua: userName,
+        noiDung: moTa,
+      };
+
+      updateQuery.$push = {
+        lichSuThaoTac: logEntry,
+        lichSuChinhSua: logEntry,
+      };
+    }
 
     const updated = await this.caseModel.findByIdAndUpdate(
       id,
-      { $set: cleanData },
+      updateQuery,
       { returnDocument: 'after' },
     );
     if (!updated) {
@@ -289,7 +462,7 @@ export class CasesService {
   }
 
   // Tiếp nhận ca xét nghiệm (chuyển trạng thái sang chay_ket_qua)
-  async acceptCase(id: string, bacSiDoc?: string, bacSiDoc2?: string): Promise<BioCase> {
+  async acceptCase(id: string, bacSiDoc?: string, bacSiDoc2?: string, user?: any): Promise<BioCase> {
     const existing = await this.caseModel.findById(id);
     if (!existing) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm để tiếp nhận');
@@ -316,10 +489,49 @@ export class CasesService {
       updatePayload.bacSiDoc2 = bacSiDoc;
     }
 
+    const userName = user?.fullName || user?.username || 'Phòng Lab (Admin)';
+    const acceptLog: any = {
+      id: new Types.ObjectId().toString(),
+      nguoiThucHien: userName,
+      username: user?.username || '',
+      vaiTro: user?.role || 'admin',
+      thoiGian: now.toISOString(),
+      hanhDong: 'accept',
+      moTa: 'Phòng Lab tiếp nhận mẫu và chuyển trạng thái sang Chạy kết quả',
+      chiTiet: [
+        {
+          truong: 'Trạng thái phiếu',
+          fieldKey: 'trangThai',
+          giaTriCu: formatHistoryValue('trangThai', existing.trangThai),
+          giaTriMoi: 'Chạy kết quả',
+        },
+        ...(bacSiDoc ? [{
+          truong: 'Bác sĩ đọc KQ 1',
+          fieldKey: 'bacSiDoc',
+          giaTriCu: existing.bacSiDoc || '(Chưa phân công)',
+          giaTriMoi: bacSiDoc,
+        }] : []),
+        ...(bacSiDoc2 ? [{
+          truong: 'Bác sĩ đọc KQ 2 (Tế bào)',
+          fieldKey: 'bacSiDoc2',
+          giaTriCu: existing.bacSiDoc2 || '(Chưa phân công)',
+          giaTriMoi: bacSiDoc2,
+        }] : []),
+      ],
+      nguoiSua: userName,
+      noiDung: 'Tiếp nhận mẫu vào phòng Lab',
+    };
+
     const updated = await this.caseModel.findByIdAndUpdate(
       id,
-      { $set: updatePayload },
-      { new: true },
+      {
+        $set: updatePayload,
+        $push: {
+          lichSuThaoTac: acceptLog,
+          lichSuChinhSua: acceptLog,
+        },
+      },
+      { returnDocument: 'after' },
     );
     if (!updated) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm để tiếp nhận');
@@ -386,7 +598,9 @@ export class CasesService {
       bacSiDoc?: string;
       specificResults?: Partial<BioCase>;
     },
+    user?: any,
   ): Promise<BioCase> {
+    const existing = await this.caseModel.findById(id);
     const updateData: any = {
       ...payload.specificResults,
       ketLuan: payload.ketLuan,
@@ -399,10 +613,34 @@ export class CasesService {
       status: 'diagnosed',
     };
 
+    const userName = user?.fullName || user?.username || payload.bacSiDoc || 'Bác sĩ';
+    const signLog: any = {
+      id: new Types.ObjectId().toString(),
+      nguoiThucHien: userName,
+      username: user?.username || '',
+      vaiTro: user?.role || 'doctor',
+      thoiGian: new Date().toISOString(),
+      hanhDong: 'sign',
+      moTa: `Bác sĩ ${userName} đã hoàn tất đọc và ký duyệt kết quả`,
+      chiTiet: [
+        { truong: 'Chữ ký BS 1', fieldKey: 'daKy', giaTriCu: 'Chưa ký', giaTriMoi: 'Đã ký duyệt' },
+        { truong: 'Kết luận xét nghiệm', fieldKey: 'ketLuan', giaTriCu: existing?.ketLuan || '(Trống)', giaTriMoi: payload.ketLuan },
+        ...(payload.khuyenNghi ? [{ truong: 'Khuyến nghị', fieldKey: 'khuyenNghi', giaTriCu: existing?.khuyenNghi || '(Trống)', giaTriMoi: payload.khuyenNghi }] : []),
+      ],
+      nguoiSua: userName,
+      noiDung: 'Bác sĩ ký duyệt kết quả',
+    };
+
     const updated = await this.caseModel.findByIdAndUpdate(
       id,
-      { $set: updateData },
-      { new: true },
+      {
+        $set: updateData,
+        $push: {
+          lichSuThaoTac: signLog,
+          lichSuChinhSua: signLog,
+        },
+      },
+      { returnDocument: 'after' },
     );
     if (!updated) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm để ký duyệt');
@@ -429,7 +667,7 @@ export class CasesService {
   }
 
   // Admin duyệt và Trả kết quả (da_tra_ket_qua) sau khi Bác sĩ đã ký duyệt
-  async releaseResult(id: string): Promise<BioCase> {
+  async releaseResult(id: string, user?: any): Promise<BioCase> {
     const existing = await this.caseModel.findById(id);
     if (!existing) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm');
@@ -451,6 +689,29 @@ export class CasesService {
       }
     }
 
+    const userName = user?.fullName || user?.username || 'Quản trị viên (Admin)';
+    const releaseLog: any = {
+      id: new Types.ObjectId().toString(),
+      nguoiThucHien: userName,
+      username: user?.username || '',
+      vaiTro: user?.role || 'admin',
+      thoiGian: new Date().toISOString(),
+      hanhDong: isReleased ? 'cancel_release' : 'release',
+      moTa: isReleased
+        ? 'Hủy trả kết quả (quay lại trạng thái Chạy kết quả)'
+        : 'Xác nhận trả kết quả xét nghiệm và đóng dấu hoàn tất',
+      chiTiet: [
+        {
+          truong: 'Trạng thái phiếu',
+          fieldKey: 'trangThai',
+          giaTriCu: isReleased ? 'Đã trả kết quả' : 'Chạy kết quả',
+          giaTriMoi: isReleased ? 'Chạy kết quả' : 'Đã trả kết quả',
+        },
+      ],
+      nguoiSua: userName,
+      noiDung: isReleased ? 'Hủy trả kết quả' : 'Xác nhận trả kết quả',
+    };
+
     const updated = await this.caseModel.findByIdAndUpdate(
       id,
       {
@@ -461,8 +722,12 @@ export class CasesService {
             ? null
             : new Date().toISOString().split('T')[0],
         },
+        $push: {
+          lichSuThaoTac: releaseLog,
+          lichSuChinhSua: releaseLog,
+        },
       },
-      { new: true },
+      { returnDocument: 'after' },
     );
     if (!updated) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm');
@@ -487,6 +752,122 @@ export class CasesService {
     }
 
     return updated;
+  }
+
+  // Lấy toàn bộ lịch sử thao tác của ca xét nghiệm (kèm tái tạo thông minh cho ca cũ)
+  async getHistory(id: string): Promise<any[]> {
+    const found = await this.caseModel.findById(id).lean();
+    if (!found) {
+      throw new NotFoundException('Không tìm thấy ca xét nghiệm');
+    }
+
+    let history: any[] = (found as any).lichSuThaoTac || (found as any).lichSuChinhSua || [];
+
+    // Nếu ca cũ chưa có lịch sử chi tiết, tái tạo lại dòng thời gian tự động từ dữ liệu thực tế của ca
+    if (!history || history.length === 0) {
+      history = [];
+
+      // 1. Sự kiện tạo đơn
+      const createdAt = (found as any).createdAt
+        ? new Date((found as any).createdAt).toISOString()
+        : new Date().toISOString();
+      const creatorName =
+        (found as any).nguoiNhap || (found as any).donVi || 'Quản trị viên';
+      history.push({
+        id: 'legacy-create',
+        nguoiThucHien: creatorName,
+        vaiTro: (found as any).donVi ? 'Nguồn gửi mẫu' : 'Quản trị viên',
+        thoiGian: createdAt,
+        hanhDong: 'create',
+        moTa: 'Tạo mới phiếu xét nghiệm ban đầu',
+        chiTiet: [
+          { truong: 'Mã số phiếu', fieldKey: 'maSo', giaTriCu: '', giaTriMoi: (found as any).maSo },
+          { truong: 'Bệnh nhân', fieldKey: 'hoTen', giaTriCu: '', giaTriMoi: (found as any).hoTen },
+          { truong: 'Dịch vụ', fieldKey: 'loaiXetNghiem', giaTriCu: '', giaTriMoi: this.getCategoryLabel((found as any).loaiXetNghiem) },
+          { truong: 'Đơn vị gửi mẫu', fieldKey: 'donVi', giaTriCu: '', giaTriMoi: (found as any).donVi || 'Trực tiếp' },
+        ],
+      });
+
+      // 2. Sự kiện tiếp nhận mẫu
+      if (
+        (found as any).ngayNhanMau ||
+        (found as any).trangThai === 'chay_ket_qua' ||
+        (found as any).trangThai === 'da_tra_ket_qua'
+      ) {
+        history.push({
+          id: 'legacy-accept',
+          nguoiThucHien: 'Phòng Lab (Admin)',
+          vaiTro: 'admin',
+          thoiGian: (found as any).ngayNhanMau
+            ? new Date((found as any).ngayNhanMau).toISOString()
+            : createdAt,
+          hanhDong: 'accept',
+          moTa: 'Tiếp nhận mẫu bệnh phẩm vào phòng xét nghiệm',
+          chiTiet: [
+            { truong: 'Trạng thái phiếu', fieldKey: 'trangThai', giaTriCu: 'Nhập thông tin', giaTriMoi: 'Chạy kết quả' },
+            ...((found as any).bacSiDoc ? [{ truong: 'Bác sĩ đọc KQ 1', fieldKey: 'bacSiDoc', giaTriCu: '(Chưa phân công)', giaTriMoi: (found as any).bacSiDoc }] : []),
+            ...((found as any).bacSiDoc2 ? [{ truong: 'Bác sĩ đọc KQ 2 (Tế bào)', fieldKey: 'bacSiDoc2', giaTriCu: '(Chưa phân công)', giaTriMoi: (found as any).bacSiDoc2 }] : []),
+          ],
+        });
+      }
+
+      // 3. Sự kiện bác sĩ ký duyệt
+      if ((found as any).daKy || (found as any).daKy1) {
+        history.push({
+          id: 'legacy-sign-1',
+          nguoiThucHien: (found as any).bacSiDoc || 'Bác sĩ chuyên môn',
+          vaiTro: 'doctor',
+          thoiGian: (found as any).ngayTraKetQua
+            ? new Date((found as any).ngayTraKetQua).toISOString()
+            : createdAt,
+          hanhDong: 'sign',
+          moTa: `Bác sĩ ${(found as any).bacSiDoc || ''} đã ký duyệt hoàn tất kết quả xét nghiệm`,
+          chiTiet: [
+            { truong: 'Chữ ký BS 1', fieldKey: 'daKy', giaTriCu: 'Chưa ký', giaTriMoi: 'Đã ký duyệt' },
+            ...((found as any).ketLuan ? [{ truong: 'Kết luận', fieldKey: 'ketLuan', giaTriCu: '(Trống)', giaTriMoi: (found as any).ketLuan }] : []),
+          ],
+        });
+      }
+
+      if ((found as any).daKy2) {
+        history.push({
+          id: 'legacy-sign-2',
+          nguoiThucHien: (found as any).bacSiDoc2 || 'Bác sĩ tế bào',
+          vaiTro: 'doctor',
+          thoiGian: (found as any).ngayTraKetQua
+            ? new Date((found as any).ngayTraKetQua).toISOString()
+            : createdAt,
+          hanhDong: 'sign',
+          moTa: `Bác sĩ ${(found as any).bacSiDoc2 || ''} đã ký duyệt kết quả phần 2 (Tế bào)`,
+          chiTiet: [
+            { truong: 'Chữ ký BS 2', fieldKey: 'daKy2', giaTriCu: 'Chưa ký', giaTriMoi: 'Đã ký duyệt' },
+            ...((found as any).ketLuan2 ? [{ truong: 'Kết luận 2', fieldKey: 'ketLuan2', giaTriCu: '(Trống)', giaTriMoi: (found as any).ketLuan2 }] : []),
+          ],
+        });
+      }
+
+      // 4. Sự kiện trả kết quả
+      if ((found as any).trangThai === 'da_tra_ket_qua') {
+        history.push({
+          id: 'legacy-release',
+          nguoiThucHien: 'Quản trị viên (Admin)',
+          vaiTro: 'admin',
+          thoiGian: (found as any).ngayTraKetQua
+            ? new Date((found as any).ngayTraKetQua).toISOString()
+            : new Date().toISOString(),
+          hanhDong: 'release',
+          moTa: 'Xác nhận trả kết quả và đóng dấu chứng nhận',
+          chiTiet: [
+            { truong: 'Trạng thái phiếu', fieldKey: 'trangThai', giaTriCu: 'Chạy kết quả', giaTriMoi: 'Đã trả kết quả' },
+          ],
+        });
+      }
+    }
+
+    // Sắp xếp sự kiện mới nhất lên đầu
+    return [...history].sort(
+      (a, b) => new Date(b.thoiGian || 0).getTime() - new Date(a.thoiGian || 0).getTime(),
+    );
   }
 
   async updateLabResult(

@@ -20,8 +20,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  History,
 } from 'lucide-react';
 import { toast } from '@/components/common/Toast';
+import CaseHistoryModal from './CaseHistoryModal';
 
 export interface CaseItem {
   _id: string;
@@ -297,6 +299,10 @@ export default function CaseTable({
   const [selectedDoctorForAccept, setSelectedDoctorForAccept] = useState('TS.BS Nguyễn Sỹ Lãnh');
   const [selectedDoctorForAccept2, setSelectedDoctorForAccept2] = useState('BS CK1 PHẠM THẾ HÙNG');
   const [isAccepting, setIsAccepting] = useState(false);
+
+  // History modal states
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [selectedCaseForHistory, setSelectedCaseForHistory] = useState<CaseItem | null>(null);
 
   const handleAcceptCase = async (goToDetail: boolean = false) => {
     if (!selectedCaseForAccept) return;
@@ -930,17 +936,19 @@ export default function CaseTable({
                               </span>
                             </button>
 
-                            {/* 1.5 Mở trong tab mới */}
-                            <Link
-                              href={`/results/${item._id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() => setOpenActionId(null)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-[#0070f3] transition-colors cursor-pointer"
+                            {/* 1.5 Lịch sử thao tác */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenActionId(null);
+                                setSelectedCaseForHistory(item);
+                                setShowHistoryModal(true);
+                              }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer text-left"
                             >
-                              <ExternalLink className="w-4 h-4 text-[#0070f3]" />
-                              <span>Mở trong tab mới</span>
-                            </Link>
+                              <History className="w-4 h-4 text-amber-600" />
+                              <span>Lịch sử thao tác</span>
+                            </button>
 
                             {/* 2. Sửa thông tin phiếu */}
                             <Link
@@ -1228,6 +1236,16 @@ export default function CaseTable({
           </div>
         </div>
       )}
+
+      {/* MODAL LỊCH SỬ THAO TÁC PHIẾU */}
+      <CaseHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => {
+          setShowHistoryModal(false);
+          setSelectedCaseForHistory(null);
+        }}
+        caseItem={selectedCaseForHistory}
+      />
     </div>
   );
 }

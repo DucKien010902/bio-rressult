@@ -30,15 +30,53 @@ export class LabMetric {
 export const LabMetricSchema = SchemaFactory.createForClass(LabMetric);
 
 @Schema({ _id: false })
+export class HistoryChangeItem {
+  @Prop({ default: '' })
+  truong!: string;
+
+  @Prop({ default: '' })
+  fieldKey!: string;
+
+  @Prop({ type: Object, default: null })
+  giaTriCu?: any;
+
+  @Prop({ type: Object, default: null })
+  giaTriMoi?: any;
+}
+export const HistoryChangeItemSchema = SchemaFactory.createForClass(HistoryChangeItem);
+
+@Schema({ _id: false })
 export class EditHistory {
   @Prop({ default: '' })
-  nguoiSua!: string;
+  id?: string;
 
   @Prop({ default: '' })
+  nguoiThucHien!: string;
+
+  @Prop({ default: '' })
+  username?: string;
+
+  @Prop({ default: '' })
+  vaiTro?: string;
+
+  @Prop({ default: () => new Date().toISOString() })
   thoiGian!: string;
 
+  @Prop({ default: 'update' })
+  hanhDong!: string;
+
   @Prop({ default: '' })
-  noiDung!: string;
+  moTa!: string;
+
+  @Prop({ type: [HistoryChangeItemSchema], default: [] })
+  chiTiet?: HistoryChangeItem[];
+
+  // Tương thích ngược với các trường cũ
+  @Prop({ default: '' })
+  nguoiSua?: string;
+
+  @Prop({ default: '' })
+  noiDung?: string;
 }
 
 export const EditHistorySchema = SchemaFactory.createForClass(EditHistory);
@@ -241,6 +279,9 @@ export class BioCase extends Document {
 
   @Prop({ type: [EditHistorySchema], default: [] })
   lichSuChinhSua!: EditHistory[];
+
+  @Prop({ type: [EditHistorySchema], default: [] })
+  lichSuThaoTac!: EditHistory[];
 
   // ==========================================
   // Các trường tương thích ngược (Legacy support)

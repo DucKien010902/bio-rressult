@@ -342,7 +342,7 @@ export class CasesController {
         allowedLabData.hoTen = allowedLabData.hoTen.trim().toUpperCase();
         allowedLabData.patientName = allowedLabData.hoTen;
       }
-      return this.casesService.update(id, allowedLabData);
+      return this.casesService.update(id, allowedLabData, req.user);
     }
 
     // 2. Phân quyền cho tài khoản Bác sĩ (doctor / bacsy):
@@ -431,7 +431,7 @@ export class CasesController {
       }
     }
 
-    return this.casesService.update(id, data);
+    return this.casesService.update(id, data, req.user);
   }
 
   // Tiếp nhận phiếu xét nghiệm (chuyển sang chay_ket_qua)
@@ -447,7 +447,7 @@ export class CasesController {
         'Tài khoản đơn vị không có quyền tiếp nhận phiếu!',
       );
     }
-    return this.casesService.acceptCase(id, bacSiDoc, bacSiDoc2);
+    return this.casesService.acceptCase(id, bacSiDoc, bacSiDoc2, req.user);
   }
 
   // Bác sĩ hoàn thành đọc & ký duyệt
@@ -468,7 +468,7 @@ export class CasesController {
         'Tài khoản đơn vị không có quyền ký duyệt kết quả!',
       );
     }
-    return this.casesService.signAndDiagnose(id, body);
+    return this.casesService.signAndDiagnose(id, body, req.user);
   }
 
   // Admin / Super Admin duyệt và Trả kết quả (da_tra_ket_qua) sau khi Bác sĩ đã ký
@@ -481,7 +481,13 @@ export class CasesController {
         'Chỉ tài khoản Quản trị (Admin/Super Admin) mới có quyền xác nhận trả kết quả!',
       );
     }
-    return this.casesService.releaseResult(id);
+    return this.casesService.releaseResult(id, req.user);
+  }
+
+  // Xem lịch sử thao tác và chỉnh sửa của phiếu
+  @Get(':id/history')
+  async getHistory(@Param('id') id: string) {
+    return this.casesService.getHistory(id);
   }
 
   @Put(':id/lab-result')
