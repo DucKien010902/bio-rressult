@@ -1,7 +1,11 @@
-import { Controller, Get, Put, Body, Param } from '@nestjs/common';
+import { Controller, Get, Put, Body, Param, UseGuards } from '@nestjs/common';
 import { SettingsService } from './settings.service.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
 
 @Controller('settings')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
@@ -11,6 +15,7 @@ export class SettingsController {
   }
 
   @Put('turnaround-time')
+  @Roles('superadmin')
   async updateTurnaroundTime(@Body() body: Record<string, number>) {
     return this.settingsService.updateTurnaroundTime(body);
   }
@@ -21,6 +26,7 @@ export class SettingsController {
   }
 
   @Put(':key')
+  @Roles('superadmin')
   async updateSetting(
     @Param('key') key: string,
     @Body() body: Record<string, any>,

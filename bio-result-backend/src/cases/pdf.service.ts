@@ -51,7 +51,17 @@ export const PDF_TEMPLATES_CATALOG: PdfTemplateOption[] = [
     description: 'Phiếu kết quả xét nghiệm 23 tuýp HPV Real-time PCR đầy đủ khung viền & logo',
   },
 
-  // 4. CELL (Tế bào học cổ tử cung)
+  // 4. HPV 24 Types
+  {
+    id: 'hpv24_default',
+    name: 'Mẫu chuẩn GenHD (24 Types)',
+    category: 'hpv24',
+    templateFile: 'sample_hpv24.pdf',
+    isDefault: true,
+    description: 'Phiếu kết quả xét nghiệm 24 tuýp HPV Real-time PCR đầy đủ khung viền & logo',
+  },
+
+  // 5. CELL (Tế bào học cổ tử cung)
   {
     id: 'cell_default',
     name: 'Mẫu chuẩn Cell GenHD (Bethesda 2014)',
@@ -125,6 +135,14 @@ export const PDF_TEMPLATES_CATALOG: PdfTemplateOption[] = [
     description: 'Phiếu kết quả 2 trang: HPV 23 và Cell',
   },
   {
+    id: 'combo_hpv24_cell_default',
+    name: 'Mẫu chuẩn: Combo HPV 24 + Cell (2 trang)',
+    category: 'combo_hpv24_cell',
+    templateFile: 'combo_hpv24_cell',
+    isDefault: true,
+    description: 'Phiếu kết quả 2 trang: HPV 24 và Cell',
+  },
+  {
     id: 'combo_hpv20_thinprep_default',
     name: 'Mẫu chuẩn: Combo HPV 20 + ThinPrep (2 trang)',
     category: 'combo_hpv20_thinprep',
@@ -147,6 +165,14 @@ export const PDF_TEMPLATES_CATALOG: PdfTemplateOption[] = [
     templateFile: 'combo_hpv23_thinprep',
     isDefault: true,
     description: 'Phiếu kết quả 2 trang: HPV 23 và ThinPrep',
+  },
+  {
+    id: 'combo_hpv24_thinprep_default',
+    name: 'Mẫu chuẩn: Combo HPV 24 + ThinPrep (2 trang)',
+    category: 'combo_hpv24_thinprep',
+    templateFile: 'combo_hpv24_thinprep',
+    isDefault: true,
+    description: 'Phiếu kết quả 2 trang: HPV 24 và ThinPrep',
   },
 ];
 
@@ -253,7 +279,7 @@ export class PdfService {
         0,
         selectedTpl?.id,
       );
-    } else if (cat === 'hpv40' || cat === 'hpv20' || cat === 'hpv23') {
+    } else if (cat === 'hpv40' || cat === 'hpv20' || cat === 'hpv23' || cat === 'hpv24') {
       await this.hpvPdfService.generatePdf(
         pdfDoc,
         caseItem,

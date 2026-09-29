@@ -34,6 +34,7 @@ const SERVICE_CATEGORIES = [
   { id: 'hpv40', label: 'Sinh học phân tử (HPV 40)', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   { id: 'hpv20', label: 'Sinh học phân tử (HPV 20)', badge: 'bg-teal-50 text-teal-700 border-teal-200' },
   { id: 'hpv23', label: 'Sinh học phân tử (HPV 23)', badge: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  { id: 'hpv24', label: 'Sinh học phân tử (HPV 24)', badge: 'bg-teal-50 text-teal-800 border-teal-300' },
   { id: 'soituoi', label: 'Vi sinh (Soi tươi)', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
   { id: 'giaiphaubenh', label: 'Mô bệnh học (Giải phẫu bệnh)', badge: 'bg-purple-50 text-purple-700 border-purple-200' },
 ];
@@ -64,7 +65,7 @@ function SettingsSourcesContent() {
     soDienThoai: '',
     email: '',
     diaChi: '',
-    allowedCategories: ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'soituoi', 'giaiphaubenh'],
+    allowedCategories: ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh'],
     isActive: true,
   });
 
@@ -125,7 +126,7 @@ function SettingsSourcesContent() {
       diaChi: src.diaChi || '',
       allowedCategories: Array.isArray(src.allowedCategories) && src.allowedCategories.length > 0
         ? src.allowedCategories
-        : ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'soituoi', 'giaiphaubenh'],
+        : ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh'],
       isActive: src.isActive !== false,
     });
     setIsEditModalOpen(true);
@@ -142,7 +143,7 @@ function SettingsSourcesContent() {
       soDienThoai: '',
       email: '',
       diaChi: '',
-      allowedCategories: ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'soituoi', 'giaiphaubenh'],
+      allowedCategories: ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh'],
       isActive: true,
     });
     setIsAddModalOpen(true);

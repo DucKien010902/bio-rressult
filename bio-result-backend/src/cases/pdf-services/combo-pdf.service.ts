@@ -28,6 +28,8 @@ export class ComboPdfService extends BasePdfService {
   ): Promise<Buffer> {
     const hpvCat = cat.includes('hpv40')
       ? 'hpv40'
+      : cat.includes('hpv24')
+      ? 'hpv24'
       : cat.includes('hpv23')
       ? 'hpv23'
       : 'hpv20';
@@ -38,6 +40,8 @@ export class ComboPdfService extends BasePdfService {
     const hpvTemplate =
       hpvCat === 'hpv40'
         ? 'sample_hpv40.pdf'
+        : hpvCat === 'hpv24'
+        ? 'sample_hpv24.pdf'
         : hpvCat === 'hpv23'
         ? 'sample_hpv23.pdf'
         : 'sample_hpv20.pdf';

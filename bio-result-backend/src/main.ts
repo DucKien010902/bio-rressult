@@ -1,9 +1,21 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { json, urlencoded } from 'express';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Tin cậy Reverse Proxy (Vercel, Cloudflare, Nginx) để lấy IP thật của người dùng cho Throttler
+  (app.getHttpAdapter().getInstance() as any).set('trust proxy', 1);
+
+  // Thiết lập bảo mật HTTP Headers với Helmet
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: false,
+    }),
+  );
 
   // Cho phép payload lớn (ảnh chụp tiêu bản, biểu đồ HPV, dữ liệu phiếu chi tiết)
   app.use(json({ limit: '50mb' }));
@@ -12,9 +24,13 @@ async function bootstrap() {
   // Cấu hình tiền tố URL API
   app.setGlobalPrefix('api');
 
-  // Cấu hình CORS để Next.js (port 3000, 3001) gọi được
+  // Cấu hình CORS an toàn
   app.enableCors({
-    origin: true,
+    origin: [
+      'https://genhd.vercel.app',
+      /https:\/\/.*\.vercel\.app$/,
+      /http:\/\/localhost:[0-9]+$/,
+    ],
     credentials: true,
   });
 

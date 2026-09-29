@@ -76,11 +76,6 @@ export default function PatientInfoCard({
           <FileText className="w-5 h-5 text-sky-600" />
           <span>Thông tin hành chính bệnh nhân</span>
         </div>
-        {isDoctor && (
-          <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
-            Tài khoản Bác sĩ chỉ xem thông tin hành chính
-          </span>
-        )}
       </div>
 
       {/* Row 1 */}
@@ -220,26 +215,73 @@ export default function PatientInfoCard({
       </div>
 
       {/* Row 4: Bác sĩ đọc kết quả (Gán phiếu) */}
-      <div className="text-xs">
-        <label className="block text-[11px] font-bold text-sky-700 mb-1 flex items-center justify-between">
-          <span>Bác sĩ đọc kết quả (Gán phiếu) *</span>
-        </label>
-        <select
-          disabled={!isAdmin}
-          value={caseData?.bacSiDoc || 'TS.BS Nguyễn Sỹ Lãnh'}
-          onChange={(e) => onChange('bacSiDoc', e.target.value)}
-          className={`w-full sm:w-1/2 px-3.5 py-2.5 rounded-xl border font-bold transition-all ${isAdmin
+      {caseData?.loaiXetNghiem?.toLowerCase()?.startsWith('combo_') ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div>
+            <label className="block text-[11px] font-bold text-sky-700 mb-1 flex items-center justify-between">
+              <span>Bác sĩ 1 (Đọc kết quả HPV) *</span>
+            </label>
+            <select
+              disabled={!isAdmin}
+              value={caseData?.bacSiDoc || (doctorList.length > 0 ? doctorList[0].fullName : 'TS.BS Nguyễn Sỹ Lãnh')}
+              onChange={(e) => onChange('bacSiDoc', e.target.value)}
+              className={`w-full px-3.5 py-2.5 rounded-xl border font-bold transition-all ${isAdmin
+                ? 'border-sky-300 bg-sky-50/50 text-slate-900 focus:bg-white focus:outline-none focus:border-[#0070f3] cursor-pointer'
+                : 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none'
+                }`}
+            >
+              {doctorList.map((doc) => (
+                <option key={`doc1-${doc.username || doc.fullName}`} value={doc.fullName}>
+                  {doc.fullName} ({doc.username})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-purple-700 mb-1 flex items-center justify-between">
+              <span>Bác sĩ 2 (Đọc kết quả Tế bào / ThinPrep) *</span>
+            </label>
+            <select
+              disabled={!isAdmin}
+              value={caseData?.bacSiDoc2 || ''}
+              onChange={(e) => onChange('bacSiDoc2', e.target.value)}
+              className={`w-full px-3.5 py-2.5 rounded-xl border font-bold transition-all ${isAdmin
+                ? 'border-purple-300 bg-purple-50/50 text-slate-900 focus:bg-white focus:outline-none focus:border-purple-600 cursor-pointer'
+                : 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none'
+                }`}
+            >
+              <option value="" disabled>-- Chưa phân công Bác sĩ 2 --</option>
+              {doctorList.map((doc) => (
+                <option key={`doc2-${doc.username || doc.fullName}`} value={doc.fullName}>
+                  {doc.fullName} ({doc.username})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ) : (
+        <div className="text-xs">
+          <label className="block text-[11px] font-bold text-sky-700 mb-1 flex items-center justify-between">
+            <span>Bác sĩ đọc kết quả (Gán phiếu) *</span>
+          </label>
+          <select
+            disabled={!isAdmin}
+            value={caseData?.bacSiDoc || 'TS.BS Nguyễn Sỹ Lãnh'}
+            onChange={(e) => onChange('bacSiDoc', e.target.value)}
+            className={`w-full sm:w-1/2 px-3.5 py-2.5 rounded-xl border font-bold transition-all ${isAdmin
               ? 'border-sky-300 bg-sky-50/50 text-slate-900 focus:bg-white focus:outline-none focus:border-[#0070f3] cursor-pointer'
               : 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none'
-            }`}
-        >
-          {doctorList.map((doc) => (
-            <option key={doc.username || doc.fullName} value={doc.fullName}>
-              {doc.fullName} ({doc.username})
-            </option>
-          ))}
-        </select>
-      </div>
+              }`}
+          >
+            {doctorList.map((doc) => (
+              <option key={doc.username || doc.fullName} value={doc.fullName}>
+                {doc.fullName} ({doc.username})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Card Action Footer */}
       {!isDoctor && (

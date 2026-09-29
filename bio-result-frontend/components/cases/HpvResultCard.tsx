@@ -32,6 +32,7 @@ interface HpvResultCardProps {
   isSaving?: boolean;
   isCombo?: boolean;
   currentUser?: any;
+  canEdit?: boolean;
 }
 
 export default function HpvResultCard({
@@ -42,10 +43,12 @@ export default function HpvResultCard({
   isSaving = false,
   isCombo = false,
   currentUser,
+  canEdit = true,
 }: HpvResultCardProps) {
   const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
   const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
   const isLab = currentUser?.role === 'lab';
+  const isEditable = !isLab && canEdit;
   const [collapsed, setCollapsed] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,13 +66,16 @@ export default function HpvResultCard({
   const cat = (caseData?.loaiXetNghiem || 'hpv40').toLowerCase();
   const isHpv40 = cat === 'hpv40' || cat === 'combo_hpv40_cell' || cat === 'combo_hpv40_thinprep';
   const isHpv23 = cat === 'hpv23' || cat === 'combo_hpv23_cell' || cat === 'combo_hpv23_thinprep';
-  const isHpv20 = !isHpv40 && !isHpv23;
+  const isHpv24 = cat === 'hpv24';
+  const isHpv20 = !isHpv40 && !isHpv23 && !isHpv24;
 
   const testTitle = isHpv40
     ? 'KẾT QUẢ XÉT NGHIỆM HPV 40 TYPES (REAL-TIME PCR)'
-    : isHpv23
-      ? 'KẾT QUẢ XÉT NGHIỆM HPV 23 TYPES (REAL-TIME PCR)'
-      : 'KẾT QUẢ XÉT NGHIỆM HPV 20 TYPES (REAL-TIME PCR)';
+    : isHpv24
+      ? 'KẾT QUẢ XÉT NGHIỆM HPV 24 TYPES (REAL-TIME PCR)'
+      : isHpv23
+        ? 'KẾT QUẢ XÉT NGHIỆM HPV 23 TYPES (REAL-TIME PCR)'
+        : 'KẾT QUẢ XÉT NGHIỆM HPV 20 TYPES (REAL-TIME PCR)';
 
   // Xóa ảnh khỏi MinIO & CSDL Mongo
   const handleDeleteImage = async (field: string = 'anhHpv') => {
@@ -207,6 +213,15 @@ export default function HpvResultCard({
 
       {!collapsed && (
         <div className="p-6 space-y-6 text-xs text-slate-700">
+          {/* Thông báo phân quyền nếu là ca Combo mà Bác sĩ này không phụ trách phần HPV */}
+          {isCombo && !canEdit && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2.5 text-xs text-amber-800 font-medium">
+              <span className="text-base">ℹ️</span>
+              <span>
+                Ca Combo được phân công 2 Bác sĩ khác nhau: Phần 1 (Xét nghiệm HPV) này do Bác sĩ <strong>{caseData?.bacSiDoc || 'Bác sĩ 1'}</strong> phụ trách đọc kết quả. Bạn chỉ có quyền xem, không được chỉnh sửa hoặc ký duyệt thay.
+              </span>
+            </div>
+          )}
           {/* HPV Risk Groups Section */}
           <div className="space-y-4">
             {/* Group 1: HPV Nguy cơ cao 16, 18 (All types) */}
@@ -221,11 +236,11 @@ export default function HpvResultCard({
               </div>
               <input
                 type="text"
-                disabled={isLab}
+                disabled={!isEditable}
                 value={caseData?.hpvHighRiskResult || 'Âm tính'}
                 onChange={(e) => onChange('hpvHighRiskResult', e.target.value)}
                 placeholder="Âm tính / Dương tính..."
-                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
+                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${!isEditable ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
                   }`}
               />
             </div>
@@ -244,11 +259,11 @@ export default function HpvResultCard({
               </div>
               <input
                 type="text"
-                disabled={isLab}
+                disabled={!isEditable}
                 value={caseData?.hpvHighRiskOtherResult || 'Âm tính'}
                 onChange={(e) => onChange('hpvHighRiskOtherResult', e.target.value)}
                 placeholder="Âm tính / Dương tính..."
-                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
+                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${!isEditable ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
                   }`}
               />
             </div>
@@ -266,11 +281,11 @@ export default function HpvResultCard({
                 </div>
                 <input
                   type="text"
-                  disabled={isLab}
+                  disabled={!isEditable}
                   value={caseData?.hpvOtherTypesResult || 'Âm tính'}
                   onChange={(e) => onChange('hpvOtherTypesResult', e.target.value)}
                   placeholder="Âm tính / Dương tính..."
-                  className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
+                  className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${!isEditable ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
                     }`}
                 />
               </div>
@@ -280,19 +295,23 @@ export default function HpvResultCard({
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-bold text-sky-700 uppercase block">
-                  {isHpv23 ? '4. NHÓM HPV NGUY CƠ THẤP (2 TYPES)' : '3. NHÓM HPV NGUY CƠ THẤP (2 TYPES)'}
+                  {isHpv23
+                    ? '4. NHÓM HPV NGUY CƠ THẤP (2 TYPES)'
+                    : isHpv24
+                      ? '3. NHÓM HPV NGUY CƠ THẤP (6 TYPES)'
+                      : '3. NHÓM HPV NGUY CƠ THẤP (2 TYPES)'}
                 </span>
                 <span className="text-xs text-slate-500">
-                  Khảo sát 2 chủng: 6, 11
+                  {isHpv24 ? 'Khảo sát 6 chủng: 6, 11, 42, 43, 44, 81' : 'Khảo sát 2 chủng: 6, 11'}
                 </span>
               </div>
               <input
                 type="text"
-                disabled={isLab}
+                disabled={!isEditable}
                 value={caseData?.hpvLowRiskResult || 'Âm tính'}
                 onChange={(e) => onChange('hpvLowRiskResult', e.target.value)}
                 placeholder="Âm tính / Dương tính..."
-                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-sky-200 font-bold text-xs text-sky-700 text-center ${isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-sky-50/50 focus:outline-none focus:border-sky-400'
+                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-sky-200 font-bold text-xs text-sky-700 text-center ${!isEditable ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-sky-50/50 focus:outline-none focus:border-sky-400'
                   }`}
               />
             </div>
@@ -427,7 +446,7 @@ export default function HpvResultCard({
                 disabled={isLab}
                 value={
                   caseData?.ketLuan ||
-                  `ÂM TÍNH VỚI VIRUS HPV (${isHpv40 ? '40' : isHpv23 ? '23' : '20'} TYPE TRÊN) TRÊN MẪU NHẬN ĐƯỢC.`
+                  `ÂM TÍNH VỚI VIRUS HPV (${isHpv40 ? '40' : isHpv24 ? '24' : isHpv23 ? '23' : '20'} TYPE TRÊN) TRÊN MẪU NHẬN ĐƯỢC.`
                 }
                 onChange={(e) => onChange('ketLuan', e.target.value)}
                 className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all ${isLab
@@ -506,7 +525,7 @@ export default function HpvResultCard({
             </div>
 
             <div className="flex items-center gap-2 pt-2 sm:pt-0">
-              {!isLab && (
+              {isEditable && (
                 <>
                   <button
                     type="button"

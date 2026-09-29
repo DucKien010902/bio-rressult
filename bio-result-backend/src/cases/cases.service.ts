@@ -86,15 +86,12 @@ export class CasesService {
     }
 
     const query = conditions.length > 0 ? { $and: conditions } : {};
-    console.log('[CasesService.findAll] Executing query:', JSON.stringify(query));
-    const start = Date.now();
     const result = await this.caseModel
       .find(query)
       .select('-anhTeBao -anhGpb -anhHpv -pdfBuffer -bieuDoHpv -signatureImage')
       .sort({ createdAt: -1 })
       .lean()
       .exec();
-    console.log(`[CasesService.findAll] Completed in ${Date.now() - start}ms, returned ${result.length} cases`);
     return result as any;
   }
 
@@ -292,7 +289,7 @@ export class CasesService {
   }
 
   // Tiếp nhận ca xét nghiệm (chuyển trạng thái sang chay_ket_qua)
-  async acceptCase(id: string, bacSiDoc?: string): Promise<BioCase> {
+  async acceptCase(id: string, bacSiDoc?: string, bacSiDoc2?: string): Promise<BioCase> {
     const existing = await this.caseModel.findById(id);
     if (!existing) {
       throw new NotFoundException('Không tìm thấy ca xét nghiệm để tiếp nhận');
@@ -312,10 +309,13 @@ export class CasesService {
     if (bacSiDoc) {
       updatePayload.bacSiDoc = bacSiDoc;
       updatePayload.doctorName = bacSiDoc;
-      if (existing.loaiXetNghiem?.startsWith('combo_') && !existing.bacSiDoc2) {
-        updatePayload.bacSiDoc2 = bacSiDoc;
-      }
     }
+    if (bacSiDoc2) {
+      updatePayload.bacSiDoc2 = bacSiDoc2;
+    } else if (existing.loaiXetNghiem?.toLowerCase()?.startsWith('combo_') && !existing.bacSiDoc2 && bacSiDoc) {
+      updatePayload.bacSiDoc2 = bacSiDoc;
+    }
+
     const updated = await this.caseModel.findByIdAndUpdate(
       id,
       { $set: updatePayload },
@@ -328,9 +328,13 @@ export class CasesService {
     // 2. Khi Admin nhận mẫu -> Thông báo lại Nguồn
     try {
       if (updated.donVi) {
+        const docMsg = bacSiDoc2 && bacSiDoc2 !== bacSiDoc
+          ? ` Bác sĩ phân công: BS1: ${bacSiDoc}, BS2: ${bacSiDoc2}.`
+          : (bacSiDoc ? ` Bác sĩ phân công: ${bacSiDoc}.` : '');
+
         await this.notificationsService.createNotification({
           title: `Phòng Lab đã tiếp nhận mẫu: ${updated.maSo}`,
-          message: `Mẫu xét nghiệm của bệnh nhân ${updated.hoTen} (${updated.maSo}) từ đơn vị "${updated.donVi}" đã được phòng Lab tiếp nhận và bắt đầu thực hiện xét nghiệm.${bacSiDoc ? ` Bác sĩ phân công: ${bacSiDoc}.` : ''}`,
+          message: `Mẫu xét nghiệm của bệnh nhân ${updated.hoTen} (${updated.maSo}) từ đơn vị "${updated.donVi}" đã được phòng Lab tiếp nhận và bắt đầu thực hiện xét nghiệm.${docMsg}`,
           testResultId: updated._id.toString(),
           caseCode: updated.maSo,
           patientName: updated.hoTen,
@@ -344,11 +348,24 @@ export class CasesService {
       if (bacSiDoc) {
         await this.notificationsService.createNotification({
           title: `Bạn có ca xét nghiệm mới cần đọc KQ: ${updated.maSo}`,
-          message: `Bạn được phân công đọc kết quả xét nghiệm cho bệnh nhân ${updated.hoTen} (${updated.maSo}) - Dịch vụ: ${this.getCategoryLabel(updated.loaiXetNghiem)}. Vui lòng kiểm tra và chẩn đoán.`,
+          message: `Bạn được phân công đọc kết quả xét nghiệm cho bệnh nhân ${updated.hoTen} (${updated.maSo}) - Dịch vụ: ${this.getCategoryLabel(updated.loaiXetNghiem)}${updated.loaiXetNghiem?.startsWith('combo_') ? ' (Phần 1: HPV)' : ''}. Vui lòng kiểm tra và chẩn đoán.`,
           testResultId: updated._id.toString(),
           caseCode: updated.maSo,
           patientName: updated.hoTen,
           doctorName: bacSiDoc,
+          recipientRole: 'doctor',
+          type: 'doctor_assigned',
+        });
+      }
+
+      if (bacSiDoc2 && bacSiDoc2 !== bacSiDoc) {
+        await this.notificationsService.createNotification({
+          title: `Bạn có ca xét nghiệm mới cần đọc KQ: ${updated.maSo}`,
+          message: `Bạn được phân công đọc kết quả xét nghiệm cho bệnh nhân ${updated.hoTen} (${updated.maSo}) - Dịch vụ: ${this.getCategoryLabel(updated.loaiXetNghiem)} (Phần 2: Tế bào/ThinPrep). Vui lòng kiểm tra và chẩn đoán.`,
+          testResultId: updated._id.toString(),
+          caseCode: updated.maSo,
+          patientName: updated.hoTen,
+          doctorName: bacSiDoc2,
           recipientRole: 'doctor',
           type: 'doctor_assigned',
         });

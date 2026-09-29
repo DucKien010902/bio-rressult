@@ -4,13 +4,26 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest();
     const authHeader = request.headers.authorization;
     let token = '';
@@ -22,8 +35,9 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     if (!token) {
-      // Direct browser requests without token will default to empty user
-      return true;
+      throw new UnauthorizedException(
+        'Bạn chưa đăng nhập hoặc phiên làm việc đã kết thúc. Vui lòng đăng nhập!',
+      );
     }
 
     try {
@@ -31,9 +45,9 @@ export class JwtAuthGuard implements CanActivate {
       request.user = payload;
       return true;
     } catch {
-      // Graceful fallback: attach default admin user to avoid locking out the UI
-      request.user = { role: 'admin', fullName: 'Admin phòng Lab', donVi: 'Quản lý Lab' };
-      return true;
+      throw new UnauthorizedException(
+        'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại!',
+      );
     }
   }
 }

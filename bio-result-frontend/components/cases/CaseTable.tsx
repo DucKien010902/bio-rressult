@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Search,
   Calendar,
@@ -42,7 +42,9 @@ export interface CaseItem {
   ngayDuKienTra: string;
   ngayTraKetQua: string;
   bacSiDoc: string;
+  bacSiDoc2?: string;
   daKy: boolean;
+  daKy2?: boolean;
   trangThai: 'nhap_thong_tin' | 'chay_ket_qua' | 'da_tra_ket_qua';
   createdAt: string;
 }
@@ -61,6 +63,7 @@ export const CATEGORY_NAMES_MAP: Record<string, string> = {
   hpv40: 'Xét nghiệm HPV 40',
   hpv20: 'Xét nghiệm HPV 20',
   hpv23: 'Xét nghiệm HPV 23',
+  hpv24: 'Xét nghiệm HPV 24',
   soituoi: 'Xét nghiệm Soi tươi',
   giaiphaubenh: 'Giải Phẫu Bệnh',
   combo_hpv20_cell: 'Combo HPV 20 + Cell',
@@ -199,6 +202,7 @@ interface CaseTableProps {
   onRefresh: () => void;
   currentUser?: any;
   filterDoctorInitial?: string;
+  activeCategory?: string;
 }
 
 export default function CaseTable({
@@ -207,8 +211,15 @@ export default function CaseTable({
   onRefresh,
   currentUser,
   filterDoctorInitial = '',
+  activeCategory = '',
 }: CaseTableProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentCategory = (activeCategory || searchParams?.get('category') || '').toLowerCase();
+  const isComboCategory =
+    currentCategory.startsWith('combo_') ||
+    (cases.length > 0 && cases.every((c) => c.loaiXetNghiem?.toLowerCase()?.startsWith('combo_')));
+
   const [downloadingCaseId, setDownloadingCaseId] = useState<string | null>(null);
 
   // Turnaround times map (SLA/Deadline)
@@ -227,6 +238,7 @@ export default function CaseTable({
       hpv40: 48,
       hpv20: 48,
       hpv23: 48,
+      hpv24: 48,
       soituoi: 4,
       giaiphaubenh: 72,
       combo_hpv20_cell: 48,
@@ -283,16 +295,24 @@ export default function CaseTable({
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [selectedCaseForAccept, setSelectedCaseForAccept] = useState<CaseItem | null>(null);
   const [selectedDoctorForAccept, setSelectedDoctorForAccept] = useState('TS.BS Nguyễn Sỹ Lãnh');
+  const [selectedDoctorForAccept2, setSelectedDoctorForAccept2] = useState('BS CK1 PHẠM THẾ HÙNG');
   const [isAccepting, setIsAccepting] = useState(false);
 
   const handleAcceptCase = async (goToDetail: boolean = false) => {
     if (!selectedCaseForAccept) return;
     setIsAccepting(true);
     try {
+      const isCombo = selectedCaseForAccept.loaiXetNghiem?.toLowerCase()?.startsWith('combo_');
+      const doc1 = selectedDoctorForAccept;
+      const doc2 = isCombo ? (selectedDoctorForAccept2 || selectedDoctorForAccept) : selectedDoctorForAccept;
+
       const res = await fetch(getApiUrl(`/cases/${selectedCaseForAccept._id}/accept`), {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ bacSiDoc: selectedDoctorForAccept }),
+        body: JSON.stringify({
+          bacSiDoc: doc1,
+          bacSiDoc2: doc2,
+        }),
       });
       if (res.ok) {
         setShowAcceptModal(false);
@@ -617,28 +637,33 @@ export default function CaseTable({
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-xs">
-                <th className="py-3.5 px-4 font-bold">MÃ SỐ</th>
-                <th className="py-3.5 px-4 font-bold">HỌ VÀ TÊN</th>
-                <th className="py-3.5 px-3 font-bold text-center">NĂM SINH</th>
-                {isAdmin && <th className="py-3.5 px-4 font-bold">NGUỒN</th>}
-                <th className="py-3.5 px-4 font-bold">BS ĐỌC KQ</th>
-                <th className="py-3.5 px-4 font-bold text-center">TRẠNG THÁI</th>
-                <th className="py-3.5 px-4 font-bold">THỜI GIAN TRẢ / DỰ KIẾN</th>
-                <th className="py-3.5 px-3 font-bold text-center">NGÀY TẠO</th>
-                <th className="py-3.5 px-4 font-bold text-right pr-6">THAO TÁC</th>
+                <th className="py-3 px-3.5 font-bold">MÃ SỐ</th>
+                <th className="py-3 px-3.5 font-bold">HỌ VÀ TÊN</th>
+                {!isComboCategory && (
+                  <th className="py-3 px-3 font-bold text-center">NĂM SINH</th>
+                )}
+                {isAdmin && <th className="py-3 px-3.5 font-bold">NGUỒN</th>}
+                <th className="py-3 px-3.5 font-bold">{isComboCategory ? 'BS 1 (HPV)' : 'BS ĐỌC KQ'}</th>
+                {isComboCategory && (
+                  <th className="py-3 px-3.5 font-bold text-purple-700">BS 2 (TẾ BÀO)</th>
+                )}
+                <th className="py-3 px-3 font-bold text-center">TRẠNG THÁI</th>
+                <th className="py-3 px-3.5 font-bold">THỜI GIAN TRẢ / DỰ KIẾN</th>
+                <th className="py-3 px-3 font-bold text-center">NGÀY TẠO</th>
+                <th className="py-3 px-3.5 font-bold text-right pr-6">THAO TÁC</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={isAdmin ? 9 : 8} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={isAdmin ? (isComboCategory ? 9 : 9) : (isComboCategory ? 8 : 8)} className="py-12 text-center text-slate-400 font-medium">
                     Đang tải danh sách phiếu xét nghiệm...
                   </td>
                 </tr>
               ) : filteredCases.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 9 : 8} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={isAdmin ? (isComboCategory ? 9 : 9) : (isComboCategory ? 8 : 8)} className="py-12 text-center text-slate-400 font-medium">
                     Không tìm thấy ca xét nghiệm nào phù hợp với bộ lọc.
                   </td>
                 </tr>
@@ -682,121 +707,138 @@ export default function CaseTable({
                       className={`${rowBgClass} transition-colors cursor-pointer group`}
                     >
                       {/* Mã số */}
-                      <td className={`py-3.5 px-4 font-bold text-[#0070f3] relative ${firstCellBorder}`}>
+                      <td className={`py-3 px-3.5 relative ${firstCellBorder}`}>
                         <Link
                           href={`/results/${item._id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="block leading-tight hover:underline focus:outline-none"
+                          className="block text-xs font-bold text-[#0070f3] leading-tight hover:underline focus:outline-none"
                         >
                           {item.maSo}
                         </Link>
                         {item.loaiXetNghiem && (
-                          <span className="inline-block text-[10px] font-semibold text-slate-500 bg-slate-100/90 border border-slate-200/80 px-1.5 py-0.5 rounded-md mt-1 select-none">
+                          <span className="inline-block text-[9.5px] font-medium text-slate-500 bg-slate-100/90 border border-slate-200/80 px-1.5 py-0.5 rounded-md mt-1 select-none">
                             {CATEGORY_NAMES_MAP[item.loaiXetNghiem] || item.loaiXetNghiem}
                           </span>
                         )}
                       </td>
 
                       {/* Họ và tên */}
-                      <td className="py-3.5 px-4 font-bold text-slate-900 uppercase">
+                      <td className="py-3 px-3.5">
                         <Link
                           href={`/results/${item._id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-[#0070f3] hover:underline focus:outline-none block"
+                          className="block text-xs font-bold text-slate-800 uppercase hover:text-[#0070f3] hover:underline focus:outline-none"
                         >
                           {item.hoTen}
                         </Link>
                       </td>
 
-                      {/* Năm sinh */}
-                      <td className="py-3.5 px-3 text-center font-medium text-slate-600">
-                        {item.namSinh || '---'}
-                      </td>
+                      {/* Năm sinh (chỉ hiển thị khi không phải ca Combo) */}
+                      {!isComboCategory && (
+                        <td className="py-3 px-3 text-center text-xs font-medium text-slate-600">
+                          {item.namSinh || '---'}
+                        </td>
+                      )}
 
                       {/* Nguồn (Chỉ hiển thị với Admin) */}
                       {isAdmin && (
-                        <td className="py-3.5 px-4">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                        <td className="py-3 px-3.5">
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
                             <UserIcon className="w-3 h-3 text-slate-400" />
                             <span className="truncate max-w-[120px]">{sourceName}</span>
                           </span>
                         </td>
                       )}
 
-                      {/* Bác sĩ đọc kết quả */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-800 leading-tight">
+                      {/* Bác sĩ đọc kết quả 1 (hoặc BS đơn) */}
+                      <td className="py-3 px-3.5">
+                        <div className="text-xs font-semibold text-slate-700 leading-tight">
                           {item.bacSiDoc || 'Chưa phân công'}
                         </div>
                         {item.daKy && (
-                          <div className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Bác sĩ đã đọc</span>
+                          <div className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                            <span>{isComboCategory ? 'BS 1 đã đọc' : 'Bác sĩ đã đọc'}</span>
                           </div>
                         )}
                       </td>
 
+                      {/* Bác sĩ đọc kết quả 2 (nằm SAU BS 1 khi là ca Combo) */}
+                      {isComboCategory && (
+                        <td className="py-3 px-3.5">
+                          <div className="text-xs font-semibold text-purple-800 leading-tight">
+                            {item.bacSiDoc2 || 'Chưa phân công'}
+                          </div>
+                          {item.daKy2 && (
+                            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded-full text-[9.5px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-purple-600" />
+                              <span>BS 2 đã đọc</span>
+                            </div>
+                          )}
+                        </td>
+                      )}
+
                       {/* Trạng thái */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3 px-3.5 text-center">
                         {item.trangThai === 'da_tra_ket_qua' ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             <span>Đã trả kết quả</span>
                           </span>
                         ) : item.trangThai === 'chay_ket_qua' ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                            <FlaskConical className="w-3.5 h-3.5 text-blue-600" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                            <FlaskConical className="w-3 h-3 text-blue-600" />
                             <span>Chạy kết quả</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-600" />
                             <span>Nhập thông tin</span>
                           </span>
                         )}
                       </td>
 
                       {/* Thời gian trả / Dự kiến */}
-                      <td className="py-3.5 px-4 text-xs font-medium">
+                      <td className="py-3 px-3.5 text-xs font-medium">
                         {turnaround.isCompleted ? (
                           <div>
-                            <div className="font-bold text-slate-800">
+                            <div className="font-bold text-slate-800 text-xs">
                               {turnaround.timeStr}
                             </div>
-                            <div className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <div className="text-[10px] font-bold text-emerald-600 flex items-center gap-1 mt-0.5">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                               <span>{turnaround.subLabel}</span>
                             </div>
                           </div>
                         ) : turnaround.isUnaccepted ? (
                           <div>
-                            <div className="font-semibold text-slate-500">
+                            <div className="font-semibold text-slate-500 text-xs">
                               {turnaround.timeStr}
                             </div>
-                            <div className="text-[11px] font-bold text-amber-600 flex items-center gap-1 mt-0.5">
-                              <Clock className="w-3.5 h-3.5 text-amber-500" />
+                            <div className="text-[10px] font-bold text-amber-600 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3 text-amber-500" />
                               <span>{turnaround.subLabel}</span>
                             </div>
                           </div>
                         ) : turnaround.isOverdue ? (
                           <div>
-                            <div className="font-bold text-slate-800">
+                            <div className="font-bold text-slate-800 text-xs">
                               {turnaround.timeStr}
                             </div>
-                            <div className="text-[11px] font-bold text-red-600 flex items-center gap-1 mt-0.5">
-                              <Clock className="w-3.5 h-3.5 text-red-500" />
+                            <div className="text-[10px] font-bold text-red-600 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3 text-red-500" />
                               <span>{turnaround.subLabel}</span>
                             </div>
                           </div>
                         ) : (
                           <div>
-                            <div className="font-bold text-slate-800">
+                            <div className="font-bold text-slate-800 text-xs">
                               {turnaround.timeStr}
                             </div>
-                            <div className="text-[11px] font-semibold text-blue-600 flex items-center gap-1 mt-0.5">
-                              <Clock className="w-3.5 h-3.5 text-blue-500" />
+                            <div className="text-[10px] font-semibold text-blue-600 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3 text-blue-500" />
                               <span>{turnaround.subLabel}</span>
                             </div>
                           </div>
@@ -804,13 +846,13 @@ export default function CaseTable({
                       </td>
 
                       {/* Ngày tạo */}
-                      <td className="py-3.5 px-3 text-center text-slate-500 font-medium text-xs">
+                      <td className="py-3 px-3 text-center text-slate-500 font-medium text-xs">
                         {createdDate}
                       </td>
 
                       {/* Thao tác */}
                       <td
-                        className="py-3.5 px-4 text-right relative pr-4"
+                        className="py-3 px-3.5 text-right relative pr-4"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center justify-end gap-2">
@@ -822,7 +864,9 @@ export default function CaseTable({
                                 e.stopPropagation();
                                 setOpenActionId(null);
                                 setSelectedCaseForAccept(item);
-                                setSelectedDoctorForAccept(item.bacSiDoc || 'TS.BS Nguyễn Sỹ Lãnh');
+                                setSelectedDoctorForAccept(item.bacSiDoc || doctorList[0]?.fullName || 'TS.BS Nguyễn Sỹ Lãnh');
+                                const defaultDoc2 = doctorList.length > 2 ? doctorList[2]?.fullName : (doctorList[1]?.fullName || 'TS . BS Nguyễn Khánh Dương');
+                                setSelectedDoctorForAccept2((item as any).bacSiDoc2 || defaultDoc2);
                                 setShowAcceptModal(true);
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#00a86b] hover:bg-[#008f5a] text-white rounded-lg text-[11px] font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 leading-tight text-left"
@@ -1086,25 +1130,69 @@ export default function CaseTable({
               </div>
 
               {/* Phân công bác sĩ */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Phân công Bác sĩ đọc kết quả:
-                </label>
-                <select
-                  value={selectedDoctorForAccept}
-                  onChange={(e) => setSelectedDoctorForAccept(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer shadow-2xs"
-                >
-                  {doctorList.map((doc) => (
-                    <option key={doc.username || doc.fullName} value={doc.fullName}>
-                      {doc.fullName} ({doc.username})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Sau khi tiếp nhận, ca xét nghiệm sẽ chuyển sang trạng thái <strong>Chạy kết quả</strong>.
-                </p>
-              </div>
+              {selectedCaseForAccept.loaiXetNghiem?.toLowerCase()?.startsWith('combo_') ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>Bác sĩ 1 (Đọc kết quả HPV) *</span>
+                    </label>
+                    <select
+                      value={selectedDoctorForAccept}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedDoctorForAccept(val);
+                      }}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer shadow-2xs"
+                    >
+                      {doctorList.map((doc) => (
+                        <option key={`accept-doc1-${doc.username || doc.fullName}`} value={doc.fullName}>
+                          {doc.fullName} ({doc.username})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>Bác sĩ 2 (Đọc kết quả Tế bào / ThinPrep) *</span>
+                    </label>
+                    <select
+                      value={selectedDoctorForAccept2}
+                      onChange={(e) => setSelectedDoctorForAccept2(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer shadow-2xs"
+                    >
+                      {doctorList.map((doc) => (
+                        <option key={`accept-doc2-${doc.username || doc.fullName}`} value={doc.fullName}>
+                          {doc.fullName} ({doc.username})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Ca Combo có thể phân công 2 Bác sĩ khác nhau hoặc cùng 1 Bác sĩ đọc toàn bộ.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Phân công Bác sĩ đọc kết quả:
+                  </label>
+                  <select
+                    value={selectedDoctorForAccept}
+                    onChange={(e) => setSelectedDoctorForAccept(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer shadow-2xs"
+                  >
+                    {doctorList.map((doc) => (
+                      <option key={`accept-doc-${doc.username || doc.fullName}`} value={doc.fullName}>
+                        {doc.fullName} ({doc.username})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Sau khi tiếp nhận, ca xét nghiệm sẽ chuyển sang trạng thái <strong>Chạy kết quả</strong>.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Footer Buttons */}

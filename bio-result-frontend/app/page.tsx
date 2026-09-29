@@ -201,6 +201,7 @@ function DashboardContent() {
                 onRefresh={fetchCases}
                 currentUser={currentUser}
                 filterDoctorInitial={searchParams?.get('doctor') || ''}
+                activeCategory={activeCategory}
               />
             </>
           )}

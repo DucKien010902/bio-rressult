@@ -21,6 +21,7 @@ const SERVICES_LIST = [
   { id: 'hpv40', label: 'Xét nghiệm HPV 40 Types', group: 'Sinh học phân tử', defaultHours: 48 },
   { id: 'hpv20', label: 'Xét nghiệm HPV 20 Types', group: 'Sinh học phân tử', defaultHours: 48 },
   { id: 'hpv23', label: 'Xét nghiệm HPV 23 Types', group: 'Sinh học phân tử', defaultHours: 48 },
+  { id: 'hpv24', label: 'Xét nghiệm HPV 24 Types', group: 'Sinh học phân tử', defaultHours: 48 },
   { id: 'soituoi', label: 'Xét nghiệm Soi tươi', group: 'Vi sinh', defaultHours: 4 },
   { id: 'giaiphaubenh', label: 'Giải Phẫu Bệnh', group: 'Mô bệnh học', defaultHours: 72 },
   { id: 'combo_hpv20_cell', label: 'Gói Combo: HPV 20 + Cell', group: 'Combo 2 trong 1', defaultHours: 48 },

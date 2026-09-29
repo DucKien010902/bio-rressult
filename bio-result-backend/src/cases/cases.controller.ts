@@ -55,14 +55,7 @@ export class CasesController {
       effectiveDoctor = req.user.fullName || req.user.username;
     }
 
-    console.log('[CasesController.findAll] params:', {
-      status,
-      keyword,
-      category,
-      effectiveDoctor,
-      effectiveDonVi,
-      user: req.user,
-    });
+
 
     try {
       return await this.casesService.findAll(
@@ -355,16 +348,53 @@ export class CasesController {
     // 2. Phân quyền cho tài khoản Bác sĩ (doctor / bacsy):
     // Được chỉnh sửa kết quả xét nghiệm chuyên môn, KHÔNG được sửa thông tin cá nhân của bệnh nhân
     if (role === 'doctor' || role === 'bacsy') {
-      if (req.user.fullName) {
-        const docName = req.user.fullName.trim();
-        const isAssigned =
-          (existing.bacSiDoc && existing.bacSiDoc.includes(docName)) ||
-          (existing.doctorName && existing.doctorName.includes(docName)) ||
-          (existing.bacSiDoc2 && existing.bacSiDoc2.includes(docName));
-        if (!isAssigned) {
-          throw new ForbiddenException(
-            'Bạn chỉ có quyền chỉnh sửa ca xét nghiệm được phân công cho mình!',
-          );
+      const docName = (req.user?.fullName || '').trim();
+      const docUser = (req.user?.username || '').trim();
+
+      const isDoc1 =
+        (docName && existing.bacSiDoc && existing.bacSiDoc.includes(docName)) ||
+        (docUser && existing.bacSiDoc && existing.bacSiDoc.includes(docUser)) ||
+        (docName && existing.doctorName && existing.doctorName.includes(docName)) ||
+        (docUser && existing.doctorName && existing.doctorName.includes(docUser));
+
+      const isDoc2 =
+        (docName && existing.bacSiDoc2 && existing.bacSiDoc2.includes(docName)) ||
+        (docUser && existing.bacSiDoc2 && existing.bacSiDoc2.includes(docUser));
+
+      if (!isDoc1 && !isDoc2) {
+        throw new ForbiddenException(
+          'Bạn chỉ có quyền chỉnh sửa ca xét nghiệm được phân công cho mình!',
+        );
+      }
+
+      // Nếu là ca Combo và 2 bác sĩ khác nhau: BS 1 không được sửa kết quả BS 2 và ngược lại!
+      if (existing.loaiXetNghiem?.toLowerCase()?.startsWith('combo_')) {
+        const doc1Name = (existing.bacSiDoc || '').trim().toLowerCase();
+        const doc2Name = (existing.bacSiDoc2 || '').trim().toLowerCase();
+        const isSameDoctor = doc1Name && doc2Name && doc1Name === doc2Name;
+
+        if (!isSameDoctor) {
+          if (isDoc1 && !isDoc2) {
+            // Bác sĩ 1 (HPV) -> cấm sửa kết quả Phần 2 (Tế bào học / ThinPrep)
+            const part2Fields = [
+              'viTriBenhPham', 'tinhChatBenhPham', 'lyDoKhongDat', 'daiThe', 'viThe',
+              'nhanXetDaiThe', 'khongTonThuong', 'batThuongKhac', 'teBaoNoiMac',
+              'bienDoiViSinh', 'bienDoiKhac', 'batThuongVay', 'batThuongTuyen',
+              'anhTeBao', 'anhTeBao2', 'ketLuan2', 'daKy2', 'ngayXetNghiem2'
+            ];
+            for (const f of part2Fields) {
+              delete data[f];
+            }
+          } else if (isDoc2 && !isDoc1) {
+            // Bác sĩ 2 (Tế bào học / ThinPrep) -> cấm sửa kết quả Phần 1 (HPV)
+            const part1Fields = [
+              'hpvHighRiskResult', 'hpvHighRiskOtherResult', 'hpvLowRiskResult',
+              'hpvOtherTypesResult', 'anhHpv', 'hienBieuDo', 'ketLuan', 'daKy'
+            ];
+            for (const f of part1Fields) {
+              delete data[f];
+            }
+          }
         }
       }
 
@@ -410,13 +440,14 @@ export class CasesController {
     @Req() req: any,
     @Param('id') id: string,
     @Body('bacSiDoc') bacSiDoc?: string,
+    @Body('bacSiDoc2') bacSiDoc2?: string,
   ) {
     if (req.user?.role === 'lab') {
       throw new ForbiddenException(
         'Tài khoản đơn vị không có quyền tiếp nhận phiếu!',
       );
     }
-    return this.casesService.acceptCase(id, bacSiDoc);
+    return this.casesService.acceptCase(id, bacSiDoc, bacSiDoc2);
   }
 
   // Bác sĩ hoàn thành đọc & ký duyệt

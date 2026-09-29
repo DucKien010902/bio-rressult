@@ -116,23 +116,13 @@ export default function CaseDetailPage() {
     router.push('/login');
   };
 
-  // Field change handler: tự động đồng bộ Bác sĩ đơn 2 theo Bác sĩ đơn 1 khi là ca Combo
+  // Field change handler
   const handleFieldChange = (field: string, value: any) => {
     setIsDirty(true);
-    setCaseData((prev: any) => {
-      const updated = {
-        ...prev,
-        [field]: value,
-      };
-
-      // Nếu là ca Combo và người dùng đổi Bác sĩ đơn 1 (bacSiDoc)
-      // thì đơn 2 (bacSiDoc2) sẽ tự động nhảy theo bác sĩ đó (nhưng vẫn có thể sửa riêng đơn 2)
-      if (prev?.loaiXetNghiem?.startsWith('combo_') && field === 'bacSiDoc') {
-        updated.bacSiDoc2 = value;
-      }
-
-      return updated;
-    });
+    setCaseData((prev: any) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   // Save all changes
@@ -163,6 +153,28 @@ export default function CaseDetailPage() {
   };
 
   const [isReleasing, setIsReleasing] = useState(false);
+  const isCombo = caseData?.loaiXetNghiem?.startsWith('combo_');
+
+  const docFullName = (currentUser?.fullName || '').trim().toLowerCase();
+  const docUsername = (currentUser?.username || '').trim().toLowerCase();
+
+  const doc1 = (caseData?.bacSiDoc || '').trim().toLowerCase();
+  const doc2 = (caseData?.bacSiDoc2 || caseData?.bacSiDoc || '').trim().toLowerCase();
+
+  const isSameDoctor = Boolean(doc1 && doc2 && doc1 === doc2);
+
+  const matchesDoc1 = Boolean(
+    (docFullName && doc1.includes(docFullName)) || (docUsername && doc1.includes(docUsername))
+  );
+  const matchesDoc2 = Boolean(
+    (docFullName && doc2.includes(docFullName)) || (docUsername && doc2.includes(docUsername))
+  );
+
+  // Quyền chỉnh sửa Phần 1 (HPV):
+  const canEditHpv = isAdmin || !isDoctor || !isCombo || isSameDoctor || matchesDoc1;
+
+  // Quyền chỉnh sửa Phần 2 (Tế bào / ThinPrep):
+  const canEditCell = isAdmin || !isDoctor || !isCombo || isSameDoctor || matchesDoc2;
 
   // Toggle Doctor Signature (hỗ trợ độc lập từng phần cho gói Combo)
   // Bác sĩ ký duyệt KHÔNG tự động chuyển sang đã trả kết quả; cần bước Admin xác nhận riêng
@@ -173,7 +185,24 @@ export default function CaseDetailPage() {
       return;
     }
 
-    const isCombo = caseData.loaiXetNghiem?.startsWith('combo_');
+    // Kiểm tra quyền ký từng phần của Bác sĩ đối với ca Combo
+    if (isDoctor && isCombo && !isSameDoctor) {
+      if (part === 1 && !matchesDoc1) {
+        toast.warning(
+          `Bạn không được phân công đọc Phần 1 (HPV - do BS ${caseData?.bacSiDoc} phụ trách). Không có quyền ký duyệt!`,
+          'Từ chối quyền'
+        );
+        return;
+      }
+      if (part === 2 && !matchesDoc2) {
+        toast.warning(
+          `Bạn không được phân công đọc Phần 2 (Tế bào học - do BS ${caseData?.bacSiDoc2 || caseData?.bacSiDoc} phụ trách). Không có quyền ký duyệt!`,
+          'Từ chối quyền'
+        );
+        return;
+      }
+    }
+
     const updatePayload: any = { ...caseData };
 
     if (isCombo && part === 2) {
@@ -552,6 +581,7 @@ export default function CaseDetailPage() {
                     isSaving={isSaving}
                     isCombo={true}
                     currentUser={currentUser}
+                    canEdit={canEditHpv}
                   />
                   <CellResultCard
                     caseData={caseData}
@@ -561,6 +591,7 @@ export default function CaseDetailPage() {
                     isSaving={isSaving}
                     isCombo={true}
                     currentUser={currentUser}
+                    canEdit={canEditCell}
                   />
                 </>
               ) : ['cell', 'thinprep'].includes(caseData?.loaiXetNghiem) ? (
@@ -571,6 +602,7 @@ export default function CaseDetailPage() {
                   onToggleSign={handleToggleSign}
                   isSaving={isSaving}
                   currentUser={currentUser}
+                  canEdit={true}
                 />
               ) : caseData?.loaiXetNghiem === 'soituoi' ? (
                 <SoituoiResultCard
@@ -598,6 +630,7 @@ export default function CaseDetailPage() {
                   onToggleSign={handleToggleSign}
                   isSaving={isSaving}
                   currentUser={currentUser}
+                  canEdit={true}
                 />
               )}
 

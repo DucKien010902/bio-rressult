@@ -123,6 +123,7 @@ export default function DashboardView({
       case 'hpv20':
         return <TestTube className={className} />;
       case 'hpv23':
+      case 'hpv24':
         return <TestTube2 className={className} />;
       case 'soituoi':
         return <Microscope className={className} />;

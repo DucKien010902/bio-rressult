@@ -32,6 +32,7 @@ export const MENU_CATEGORIES: CategoryItem[] = [
   { id: 'hpv40', label: 'Xét nghiệm HPV 40', icon: FileText },
   { id: 'hpv20', label: 'Xét nghiệm HPV 20', icon: FileText },
   { id: 'hpv23', label: 'Xét nghiệm HPV 23', icon: FileText },
+  { id: 'hpv24', label: 'Xét nghiệm HPV 24', icon: FileText },
   { id: 'soituoi', label: 'Xét nghiệm Soi tươi', icon: Microscope },
   { id: 'giaiphaubenh', label: 'Giải Phẫu Bệnh', icon: ClipboardList },
   { id: 'combo_hpv20_cell', label: 'Combo: HPV 20 + Cell', icon: Layers },

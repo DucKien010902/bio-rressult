@@ -40,14 +40,16 @@ export class HpvPdfService extends BasePdfService {
     fontB: PDFFont;
     textColor: any;
   }) {
-    // 1. Che sạch toàn bộ chữ in sẵn cũ (tên & chú thích trên phôi)
-    pg.drawRectangle({
-      x: maskBox.x,
-      y: maskBox.y,
-      width: maskBox.width,
-      height: maskBox.height,
-      color: rgb(1, 1, 1),
-    });
+    // 1. Che sạch toàn bộ chữ in sẵn cũ nếu được chỉ định
+    if (maskBox && maskBox.width > 0 && maskBox.height > 0) {
+      pg.drawRectangle({
+        x: maskBox.x,
+        y: maskBox.y,
+        width: maskBox.width,
+        height: maskBox.height,
+        color: rgb(1, 1, 1),
+      });
+    }
 
     const drawCentered = (text: string, minX: number, maxX: number, y: number, opt: any = {}) => {
       if (!text) return;
@@ -699,6 +701,159 @@ export class HpvPdfService extends BasePdfService {
           // ignore error
         }
       }
+      return;
+    }
+
+    if (cat === 'hpv24') {
+      const textColor = rgb(0.1, 0.15, 0.2);
+      const blueColor = rgb(0.05, 0.25, 0.45);
+      const redColor = rgb(0.8, 0.1, 0.1);
+
+      // Hàm vẽ chữ trong suốt (không vẽ nền trắng đè lên watermark)
+      const drawText = (text: string, x: number, y: number, opt: any = {}) => {
+        if (!text) return;
+        const font = opt.bold ? fontB : fontR;
+        const size = opt.size || 9.0;
+        const color = opt.color || textColor;
+        pg.drawText(String(text), { x, y, size, font, color });
+      };
+
+      // Helper to center text in a column [minX, maxX] with auto-shrink
+      const drawCentered = (text: string, minX: number, maxX: number, y: number, opt: any = {}) => {
+        if (!text) return;
+        const font = opt.bold ? fontB : fontR;
+        let size = opt.size || 9.5;
+        const color = opt.color || textColor;
+        const maxAllowedWidth = maxX - minX - 4;
+        let width = font.widthOfTextAtSize(String(text), size);
+        if (width > maxAllowedWidth && width > 0) {
+          size = Math.max(5.5, size * (maxAllowedWidth / width));
+          width = font.widthOfTextAtSize(String(text), size);
+        }
+        const x = minX + (maxX - minX - width) / 2;
+        pg.drawText(String(text), { x, y, size, font, color });
+      };
+
+      // 1. CỘT TRÁI (Bắt đầu sau vạch kẻ x=120.02, căn chuẩn 100% cùng dòng với tiêu đề)
+      const X_LEFT = 125.0;
+      drawText(caseItem.maSo, X_LEFT, 697.4, { bold: true, size: 9.5 });
+      drawText(String(caseItem.namSinh || ''), X_LEFT, 680.4, { size: 9.0 });
+      drawText(caseItem.diaChi || '', X_LEFT, 662.4, { size: 8.5 });
+      drawText(caseItem.soDienThoai || '', X_LEFT, 645.3, { size: 9.0 });
+      drawText(caseItem.donVi || '', X_LEFT, 627.3, { size: 9.0 });
+      drawText(caseItem.loaiMau || 'Dịch phết cổ tử cung', X_LEFT, 610.4, { size: 9.0 });
+      drawText(tNhan, X_LEFT, 592.4, { size: 9.0 });
+
+      // 2. CỘT PHẢI (Căn chuẩn 100% cùng dòng với tiêu đề)
+      drawText((caseItem.hoTen || '').toUpperCase(), 356.0, 697.5, { bold: true, size: 9.5 });
+      drawText(caseItem.gioiTinh || 'Nữ', 356.0, 680.5, { size: 9.0 });
+      drawText(caseItem.bacSiChiDinh || '', 396.0, 645.3, { size: 9.0 });
+      drawText(tKq, 396.0, 592.4, { size: 9.0 });
+
+      // 3. BẢNG KẾT QUẢ 3 NHÓM (Cột KẾT QUẢ giữa X: 455.14 -> 560.64, không đổ nền trắng)
+      const colMinX = 455.14;
+      const colMaxX = 560.64;
+
+      // Row 1: HPV Nguy Cơ Cao (Type 16, 18) -> Y = 530.1
+      const r1Val = caseItem.hpvHighRiskResult || 'Âm tính';
+      const r1Pos = _isPos(r1Val);
+      drawCentered(
+        r1Val,
+        colMinX,
+        colMaxX,
+        530.1,
+        { bold: r1Pos, size: 9.5, color: r1Pos ? redColor : blueColor },
+      );
+
+      // Row 2: HPV Nguy Cơ Cao Khác (16 Types) -> Y = 498.2
+      const r2Val = caseItem.hpvHighRiskOtherResult || 'Âm tính';
+      const r2Pos = _isPos(r2Val);
+      drawCentered(
+        r2Val,
+        colMinX,
+        colMaxX,
+        498.2,
+        { bold: r2Pos, size: 9.5, color: r2Pos ? redColor : blueColor },
+      );
+
+      // Row 3: HPV Nguy Cơ Thấp (6 Types) -> Y = 466.6
+      const r3Val = caseItem.hpvLowRiskResult || 'Âm tính';
+      const r3Pos = _isPos(r3Val);
+      drawCentered(
+        r3Val,
+        colMinX,
+        colMaxX,
+        466.6,
+        { bold: r3Pos, size: 9.5, color: r3Pos ? redColor : blueColor },
+      );
+
+      // 4. BIỂU ĐỒ TÍN HIỆU TẢI LƯỢNG KẾT QUẢ (REAL-TIME PCR)
+      if (caseItem.hienBieuDo && caseItem.anhHpv) {
+        try {
+          const imgBuffer = await this.minioService.getImageBuffer(caseItem.anhHpv);
+          if (imgBuffer) {
+            await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
+              x: 45,
+              y: 325,
+              width: 505,
+              height: 84,
+            });
+          }
+        } catch (e) {
+          // ignore error
+        }
+      }
+
+      // 5. KẾT LUẬN (Căn chuẩn cùng dòng baseline Y = 290.8 với chữ "KẾT LUẬN:")
+      const hasPos = r1Pos || r2Pos || r3Pos;
+      let klText = caseItem.ketLuan || '';
+      if (!klText) {
+        if (hasPos) {
+          klText = 'DƯƠNG TÍNH VỚI VIRUS HPV TRÊN MẪU NHẬN ĐƯỢC.';
+        } else {
+          klText = 'ÂM TÍNH VỚI 24 CHỦNG HPV KHẢO SÁT TRÊN MẪU NHẬN ĐƯỢC.';
+        }
+      }
+      drawText(klText.toUpperCase(), 108.0, 290.8, {
+        bold: true,
+        size: 8.5,
+        color: hasPos ? redColor : blueColor,
+      });
+
+      // 6. NGÀY KÝ VÀ BÁC SĨ ĐỌC KẾT QUẢ
+      // Che vừa khít dòng chữ "Hà Nội, ngày       tháng       năm" in sẵn (baseline = 249.86, cao 11pt)
+      pg.drawRectangle({
+        x: 355,
+        y: 245,
+        width: 155,
+        height: 13,
+        color: rgb(1, 1, 1),
+      });
+
+      let dStr = 'Hà Nội, ngày ..... tháng ..... năm 202...';
+      if (tKq && tKq.includes('/')) {
+        const parts = tKq.split('/');
+        if (parts.length === 3) {
+          dStr = `Hà Nội, ngày ${parts[0]} tháng ${parts[1]} năm ${parts[2]}`;
+        }
+      }
+      drawCentered(dStr, 340, 520, 249.8, { size: 8.5, color: rgb(0.25, 0.3, 0.35) });
+
+      // Đổ tên, chú thích và chữ ký Bác sĩ căn giữa trực tiếp dưới "BÁC SĨ ĐỌC KẾT QUẢ" (trục centerX = 428.0)
+      // Mẫu mới đã hoàn toàn trắng phần chữ ký, TUYỆT ĐỐI KHÔNG vẽ hộp nền trắng (maskBox = 0) để không che watermark hay đè khung ghi chú
+      await this.renderDoctorSignatureBlock({
+        pdfDoc,
+        pg,
+        caseItem,
+        centerX: 428.0,
+        yName: 135.0,
+        yTitle: 120.0,
+        ySigCenter: 175.0,
+        maskBox: { x: 0, y: 0, width: 0, height: 0 },
+        fontR,
+        fontB,
+        textColor,
+      });
       return;
     }
 

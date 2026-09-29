@@ -137,6 +137,7 @@ const ALL_CATEGORIES = [
   'hpv40',
   'hpv20',
   'hpv23',
+  'hpv24',
   'soituoi',
   'giaiphaubenh',
   'combo_hpv20_cell',
@@ -477,15 +478,15 @@ async function seed() {
         }
       }
 
-      // B. HPV (hpv20, hpv23, hpv40)
-      else if (cat === 'hpv20' || cat === 'hpv23' || cat === 'hpv40') {
+      // B. HPV (hpv20, hpv23, hpv24, hpv40)
+      else if (cat === 'hpv20' || cat === 'hpv23' || cat === 'hpv24' || cat === 'hpv40') {
         baseCase.hienBieuDo = true;
 
         if (i < 8) {
           baseCase.hpvHighRiskResult = 'Âm tính';
           baseCase.hpvHighRiskOtherResult = 'Âm tính';
           baseCase.hpvLowRiskResult = 'Âm tính';
-          baseCase.ketLuan = `ÂM TÍNH VỚI VIRUS HPV (${cat === 'hpv40' ? '40' : cat === 'hpv23' ? '23' : '20'} TYPE KHẢO SÁT) TRÊN MẪU NHẬN ĐƯỢC.`;
+          baseCase.ketLuan = `ÂM TÍNH VỚI VIRUS HPV (${cat === 'hpv40' ? '40' : cat === 'hpv24' ? '24' : cat === 'hpv23' ? '23' : '20'} TYPE KHẢO SÁT) TRÊN MẪU NHẬN ĐƯỢC.`;
           baseCase.khuyenNghi = 'Khám phụ khoa và tầm soát định kỳ sau 3 năm.';
         } else if (i < 13) {
           baseCase.hpvHighRiskResult = 'Dương tính với type 16';

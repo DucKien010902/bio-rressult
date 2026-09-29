@@ -14,12 +14,18 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
+import { Public } from '../auth/decorators/public.decorator.js';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   // Endpoint công khai — trả về danh sách tài khoản để hiển thị trong modal Quick Login
+  @Public()
   @Get('accounts')
   async getAccounts() {
     const [doctors, sources] = await Promise.all([
@@ -149,22 +155,26 @@ export class UsersController {
   // API QUẢN LÝ TÀI KHOẢN ĐĂNG NHẬP (CHỈ SUPERADMIN)
   // ==========================================
   @Get('accounts-list')
+  @Roles('superadmin')
   async getAllAccounts() {
     return this.usersService.getAllAccounts();
   }
 
   @Post('accounts')
+  @Roles('superadmin')
   async createAccount(@Body() body: any) {
     return this.usersService.createAccount(body);
   }
 
   @Put('accounts/:id/toggle-active')
+  @Roles('superadmin')
   async toggleAccountActive(@Param('id') id: string) {
     const isActive = await this.usersService.toggleAccountActive(id);
     return { success: true, isActive };
   }
 
   @Put('accounts/:id')
+  @Roles('superadmin')
   async updateAccount(@Param('id') id: string, @Body() body: any) {
     const updated = await this.usersService.updateAccount(id, body);
     if (!updated) {
@@ -174,6 +184,7 @@ export class UsersController {
   }
 
   @Delete('accounts/:id')
+  @Roles('superadmin')
   async deleteAccount(@Param('id') id: string) {
     const success = await this.usersService.deleteAccount(id);
     if (!success) {

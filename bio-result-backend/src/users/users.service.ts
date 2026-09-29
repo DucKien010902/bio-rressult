@@ -108,6 +108,7 @@ const DEFAULT_CATEGORIES = [
   'hpv40',
   'hpv20',
   'hpv23',
+  'hpv24',
   'soituoi',
   'giaiphaubenh',
   'combo_hpv20_cell',
@@ -372,6 +373,13 @@ export class UsersService implements OnModuleInit {
           await source.save();
         }
       }
+
+      // Đảm bảo 100% tất cả Bác sĩ, Nguồn và User trong CSDL đều có dịch vụ 'hpv24'
+      await Promise.all([
+        this.doctorModel.updateMany({}, { $addToSet: { allowedCategories: 'hpv24' } }),
+        this.sourceModel.updateMany({}, { $addToSet: { allowedCategories: 'hpv24' } }),
+        this.userModel.updateMany({}, { $addToSet: { allowedCategories: 'hpv24' } }),
+      ]);
 
       console.log('[UsersService] Tự động đồng bộ 100% thành công Bác sĩ, Nguồn & Tài khoản trong CSDL!');
     } catch (err) {

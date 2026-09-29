@@ -6,7 +6,9 @@ import {
   Headers,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service.js';
+import { Public } from './decorators/public.decorator.js';
 
 class LoginDto {
   username!: string;
@@ -17,6 +19,9 @@ class LoginDto {
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  // Giới hạn chống dò mật khẩu (Brute-force): Tối đa 10 lần thử trong 1 phút
+  @Public()
+  @Throttle({ short: { limit: 2, ttl: 1000 }, long: { limit: 10, ttl: 60000 } })
   @Post('login')
   async login(@Body() body: LoginDto) {
     if (!body.username || !body.password) {

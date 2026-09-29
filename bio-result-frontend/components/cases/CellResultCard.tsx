@@ -32,6 +32,7 @@ interface CellResultCardProps {
   isSaving?: boolean;
   isCombo?: boolean;
   currentUser?: any;
+  canEdit?: boolean;
 }
 
 // 1. BIẾN ĐỔI TẾ BÀO DO VI SINH VẬT
@@ -82,10 +83,12 @@ export default function CellResultCard({
   isSaving = false,
   isCombo = false,
   currentUser,
+  canEdit = true,
 }: CellResultCardProps) {
   const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
   const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
   const isLab = currentUser?.role === 'lab';
+  const isEditable = !isLab && canEdit;
   const [collapsed, setCollapsed] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -277,7 +280,16 @@ export default function CellResultCard({
       </div>
 
       {!collapsed && (
-        <div className={`p-6 space-y-6 text-xs text-slate-700 ${isLab ? 'pointer-events-none select-none opacity-90' : ''}`}>
+        <div className={`p-6 space-y-6 text-xs text-slate-700 ${!isEditable ? 'pointer-events-none select-none opacity-90' : ''}`}>
+          {/* Thông báo phân quyền nếu là ca Combo mà Bác sĩ này không phụ trách phần Tế bào */}
+          {isCombo && !canEdit && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2.5 text-xs text-amber-800 font-medium pointer-events-auto">
+              <span className="text-base">ℹ️</span>
+              <span>
+                Ca Combo được phân công 2 Bác sĩ khác nhau: Phần 2 (Tế bào học / ThinPrep) này do Bác sĩ <strong>{caseData?.bacSiDoc2 || caseData?.bacSiDoc || 'Bác sĩ 2'}</strong> phụ trách đọc kết quả. Bạn chỉ có quyền xem, không được chỉnh sửa hoặc ký duyệt thay.
+              </span>
+            </div>
+          )}
           {/* Section 1: TÍNH CHẤT BỆNH PHẨM */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
@@ -641,8 +653,8 @@ export default function CellResultCard({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-2 sm:pt-0">
-              {!isLab && (
+            <div className="flex items-center gap-2 pt-2 sm:pt-0 pointer-events-auto">
+              {isEditable && (
                 <>
                   <button
                     type="button"

@@ -32,11 +32,13 @@ const SINGLE_SERVICES = [
   { id: 'thinprep', label: 'ThinPrep' },
   { id: 'hpv40', label: 'HPV 40' },
   { id: 'hpv20', label: 'HPV 20' },
+  { id: 'hpv23', label: 'HPV 23' },
+  { id: 'hpv24', label: 'HPV 24' },
   { id: 'soituoi', label: 'Soi tươi' },
   { id: 'giaiphaubenh', label: 'Giải Phẫu Bệnh' },
 ];
 
-// Danh sách các gói Combo 2 trong 1
+// Danh sách các gói Combo 2 trong 1 (HPV 24 là dịch vụ đơn lẻ, không có combo)
 const COMBO_SERVICES = [
   { id: 'combo_hpv20_cell', label: 'Gói Combo: HPV 20 + Cell' },
   { id: 'combo_hpv40_cell', label: 'Gói Combo: HPV 40 + Cell' },
@@ -75,6 +77,7 @@ function NewCaseContent() {
     bacSiChiDinh: '',
     ngayNhanMau: todayStr,
     bacSiDoc: 'Chưa phân loại',
+    bacSiDoc2: 'Chưa phân loại',
   });
 
   // Source selection states (Dành riêng cho Admin nhập thay nguồn)
@@ -162,6 +165,7 @@ function NewCaseContent() {
       hpv40: `GTHD-HPV40-${randomNum}`,
       hpv20: `GTHD-HPV20-${randomNum}`,
       hpv23: `GTHD-HPV23-${randomNum}`,
+      hpv24: `GTHD-HPV24-${randomNum}`,
       soituoi: `GTHD-ST-${randomNum}`,
       giaiphaubenh: `GTHD-GPB-${randomNum}`,
       combo_hpv20_cell: `GTHD-CB20CL-${randomNum}`,
@@ -211,6 +215,9 @@ function NewCaseContent() {
       }
 
       const isCombo = selectedCategory.startsWith('combo_');
+      const b1 = formData.bacSiDoc === 'Chưa phân loại' ? '' : formData.bacSiDoc;
+      const b2 = formData.bacSiDoc2 === 'Chưa phân loại' ? b1 : (formData.bacSiDoc2 || b1);
+
       const payload = {
         ...formData,
         donVi: effectiveDonVi,
@@ -227,8 +234,8 @@ function NewCaseContent() {
         status: 'nhap_thong_tin',
         daKy: false,
         daKy2: isCombo ? false : undefined,
-        bacSiDoc: formData.bacSiDoc === 'Chưa phân loại' ? '' : formData.bacSiDoc,
-        bacSiDoc2: isCombo ? (formData.bacSiDoc === 'Chưa phân loại' ? '' : formData.bacSiDoc) : '',
+        bacSiDoc: b1,
+        bacSiDoc2: isCombo ? b2 : '',
       };
 
       const res = await fetch(getApiUrl('/cases'), {
@@ -572,27 +579,81 @@ function NewCaseContent() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
-                    <span>Bác sĩ đọc kết quả</span>
-                  </label>
-                  <select
-                    disabled={!isAdmin}
-                    value={formData.bacSiDoc}
-                    onChange={(e) => handleFieldChange('bacSiDoc', e.target.value)}
-                    className={`w-full px-3.5 py-2.5 rounded-xl border font-medium text-xs sm:text-sm outline-none transition-all ${isAdmin
-                      ? 'bg-white text-slate-900 border-slate-200 focus:ring-2 focus:ring-[#0070f3] focus:border-[#0070f3] cursor-pointer'
-                      : 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed select-none'
-                      }`}
-                  >
-                    <option value="Chưa phân loại">-- Chưa phân công bác sĩ --</option>
-                    {doctorList.map((doc) => (
-                      <option key={doc.username || doc.fullName} value={doc.fullName}>
-                        {doc.fullName} ({doc.username})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {isCombo ? (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                        <span>Bác sĩ 1 (Đọc kết quả HPV) *</span>
+                      </label>
+                      <select
+                        disabled={!isAdmin}
+                        value={formData.bacSiDoc}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          handleFieldChange('bacSiDoc', val);
+                          if (formData.bacSiDoc2 === 'Chưa phân loại' || !formData.bacSiDoc2) {
+                            handleFieldChange('bacSiDoc2', val);
+                          }
+                        }}
+                        className={`w-full px-3.5 py-2.5 rounded-xl border font-medium text-xs sm:text-sm outline-none transition-all ${isAdmin
+                          ? 'bg-white text-slate-900 border-slate-200 focus:ring-2 focus:ring-[#0070f3] focus:border-[#0070f3] cursor-pointer'
+                          : 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed select-none'
+                          }`}
+                      >
+                        <option value="Chưa phân loại">-- Chưa phân công bác sĩ 1 --</option>
+                        {doctorList.map((doc) => (
+                          <option key={`doc1-${doc.username || doc.fullName}`} value={doc.fullName}>
+                            {doc.fullName} ({doc.username})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                        <span>Bác sĩ 2 (Đọc kết quả Tế bào / ThinPrep) *</span>
+                      </label>
+                      <select
+                        disabled={!isAdmin}
+                        value={formData.bacSiDoc2 !== 'Chưa phân loại' ? formData.bacSiDoc2 : formData.bacSiDoc}
+                        onChange={(e) => handleFieldChange('bacSiDoc2', e.target.value)}
+                        className={`w-full px-3.5 py-2.5 rounded-xl border font-medium text-xs sm:text-sm outline-none transition-all ${isAdmin
+                          ? 'bg-white text-slate-900 border-slate-200 focus:ring-2 focus:ring-[#0070f3] focus:border-[#0070f3] cursor-pointer'
+                          : 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed select-none'
+                          }`}
+                      >
+                        <option value="Chưa phân loại">-- Chưa phân công bác sĩ 2 --</option>
+                        {doctorList.map((doc) => (
+                          <option key={`doc2-${doc.username || doc.fullName}`} value={doc.fullName}>
+                            {doc.fullName} ({doc.username})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                      <span>Bác sĩ đọc kết quả</span>
+                    </label>
+                    <select
+                      disabled={!isAdmin}
+                      value={formData.bacSiDoc}
+                      onChange={(e) => handleFieldChange('bacSiDoc', e.target.value)}
+                      className={`w-full px-3.5 py-2.5 rounded-xl border font-medium text-xs sm:text-sm outline-none transition-all ${isAdmin
+                        ? 'bg-white text-slate-900 border-slate-200 focus:ring-2 focus:ring-[#0070f3] focus:border-[#0070f3] cursor-pointer'
+                        : 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed select-none'
+                        }`}
+                    >
+                      <option value="Chưa phân loại">-- Chưa phân công bác sĩ --</option>
+                      {doctorList.map((doc) => (
+                        <option key={doc.username || doc.fullName} value={doc.fullName}>
+                          {doc.fullName} ({doc.username})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
 
