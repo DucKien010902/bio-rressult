@@ -15,17 +15,20 @@ const userSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true },
+    passwordHint: { type: String, default: '' },
     fullName: { type: String, required: true },
     role: {
       type: String,
       enum: ['admin', 'doctor', 'bacsy', 'lab'],
       required: true,
     },
+    title: { type: String, default: '' },
     donVi: { type: String, default: '' },
+    signatureUrl: { type: String, default: '' },
     allowedCategories: { type: [String], default: [] },
     isActive: { type: Boolean, default: true },
   },
-  { timestamps: true },
+  { timestamps: true, strict: false },
 );
 
 // BioCase Schema with strict: false so no property is ever lost
@@ -202,6 +205,19 @@ async function seed() {
   // ==========================================
   // 1. Cập nhật Tài khoản người dùng (Users)
   // ==========================================
+  // Xóa các tài khoản bác sĩ trùng lặp hoặc không thuộc danh sách 5 bác sĩ chuẩn
+  const redundantDoctors = ['bacsi_hùng', 'bacsy', 'bacsi_đương', 'bacsi_trực', 'bacsi_theduong'];
+  const delUsersResult = await UserModel.deleteMany({
+    $or: [
+      { username: { $in: redundantDoctors } },
+      { fullName: /THẾ ĐƯƠNG/i },
+      { role: 'doctor', username: { $nin: ['bacsi_lanh', 'bacsi_duong', 'bacsi_hung', 'bacsi_truc', 'bacsi_son'] } },
+    ],
+  });
+  if (delUsersResult.deletedCount > 0) {
+    console.log(`Đã xóa ${delUsersResult.deletedCount} tài khoản bác sĩ dư thừa/trùng lặp trong CSDL.`);
+  }
+
   const pass210577 = await bcrypt.hash('210577', 10);
   const pass123456 = await bcrypt.hash('123456', 10);
 
@@ -209,6 +225,7 @@ async function seed() {
     {
       username: 'admin_lab',
       password: pass210577,
+      passwordHint: '210577',
       fullName: 'Admin phòng Lab GenHD',
       role: 'admin',
       donVi: 'Trung tâm GenHD',
@@ -218,105 +235,74 @@ async function seed() {
     {
       username: 'admin',
       password: pass123456,
+      passwordHint: '123456',
       fullName: 'Admin Hệ Thống',
       role: 'admin',
       donVi: 'Quản trị Lab',
       allowedCategories: ALL_CATEGORIES,
       isActive: true,
     },
+    // 5 Bác sĩ đọc & ký duyệt kết quả
     {
-      username: 'bacsi_hùng',
-      password: pass210577,
-      fullName: 'BS CK1 PHẠM THẾ HÙNG',
-      role: 'doctor',
-      donVi: 'Khoa Xét Nghiệm - GPB',
-      allowedCategories: ALL_CATEGORIES,
-      isActive: true,
-    },
-    {
-      username: 'bacsi_hung',
+      username: 'bacsi_lanh',
       password: pass123456,
-      fullName: 'BS CK1 PHẠM THẾ HÙNG',
+      passwordHint: '123456',
+      fullName: 'TS.BS Nguyễn Sỹ Lãnh',
       role: 'doctor',
-      donVi: 'Khoa Xét Nghiệm - GPB',
-      allowedCategories: ALL_CATEGORIES,
-      isActive: true,
-    },
-    {
-      username: 'bacsy',
-      password: pass123456,
-      fullName: 'BS CK1 PHẠM THẾ HÙNG',
-      role: 'doctor',
-      donVi: 'Khoa Xét Nghiệm',
-      allowedCategories: ALL_CATEGORIES,
-      isActive: true,
-    },
-    {
-      username: 'bacsi_đương',
-      password: pass123456,
-      fullName: 'TS . BS Nguyễn Khánh Dương',
-      role: 'doctor',
-      donVi: 'Khoa Tế Bào Học',
+      title: 'Trưởng khoa Giải phẫu bệnh BV Việt Đức',
+      donVi: 'Khoa GPB & Tế Bào',
       allowedCategories: ALL_CATEGORIES,
       isActive: true,
     },
     {
       username: 'bacsi_duong',
       password: pass123456,
+      passwordHint: '123456',
       fullName: 'TS . BS Nguyễn Khánh Dương',
       role: 'doctor',
+      title: '(Chuyên khoa Xét nghiệm - Giải phẫu bệnh lý)',
       donVi: 'Khoa Tế Bào Học',
+      allowedCategories: ALL_CATEGORIES,
+      isActive: true,
+    },
+    {
+      username: 'bacsi_hung',
+      password: pass123456,
+      passwordHint: '123456',
+      fullName: 'BS CK1 PHẠM THẾ HÙNG',
+      role: 'doctor',
+      title: '(Chuyên khoa Xét nghiệm - Giải phẫu bệnh lý)',
+      donVi: 'Khoa Xét Nghiệm - GPB',
       allowedCategories: ALL_CATEGORIES,
       isActive: true,
     },
     {
       username: 'bacsi_truc',
       password: pass123456,
+      passwordHint: '123456',
       fullName: 'BSCK1 . Nguyễn Trung Trực',
       role: 'doctor',
+      title: '(Bệnh viện K Trung Ương)',
       donVi: 'Khoa Tế Bào Học',
-      allowedCategories: ALL_CATEGORIES,
-      isActive: true,
-    },
-    {
-      username: 'bacsi_trực',
-      password: pass123456,
-      fullName: 'BSCK1 . Nguyễn Trung Trực',
-      role: 'doctor',
-      donVi: 'Khoa Tế Bào Học',
-      allowedCategories: ALL_CATEGORIES,
-      isActive: true,
-    },
-    {
-      username: 'bacsi_lanh',
-      password: pass123456,
-      fullName: 'TS.BS Nguyễn Sỹ Lãnh',
-      role: 'doctor',
-      donVi: 'Khoa GPB & Tế Bào',
       allowedCategories: ALL_CATEGORIES,
       isActive: true,
     },
     {
       username: 'bacsi_son',
       password: pass123456,
+      passwordHint: '123456',
       fullName: 'ThS.BSNT Trịnh Ngọc Sơn',
       role: 'doctor',
+      title: '(Chuyên khoa Xét nghiệm - Giải phẫu bệnh lý)',
       donVi: 'Khoa Giải Phẫu Bệnh',
       allowedCategories: ALL_CATEGORIES,
       isActive: true,
     },
-    {
-      username: 'bacsi_theduong',
-      password: pass123456,
-      fullName: 'BS PHẠM THẾ ĐƯƠNG',
-      role: 'doctor',
-      donVi: 'Khoa Tế Bào - Soi Tươi',
-      allowedCategories: ALL_CATEGORIES,
-      isActive: true,
-    },
+    // Tài khoản Lab / Tiếp nhận & Đơn vị gửi mẫu
     {
       username: 'lab',
       password: pass123456,
+      passwordHint: '123456',
       fullName: 'Kỹ Thuật Viên Tiếp Nhận',
       role: 'lab',
       donVi: 'Phòng Tiếp Nhận Mẫu',
@@ -326,7 +312,8 @@ async function seed() {
     {
       username: 'lab_phusan',
       password: pass123456,
-      fullName: 'BV Phụ Sản Hà Nội',
+      passwordHint: '123456',
+      fullName: 'Bệnh Viện Phụ Sản Hà Nội',
       role: 'lab',
       donVi: 'Bệnh Viện Phụ Sản Hà Nội',
       allowedCategories: ALL_CATEGORIES,
@@ -335,6 +322,7 @@ async function seed() {
     {
       username: 'lab_thienduc',
       password: pass123456,
+      passwordHint: '123456',
       fullName: 'Phòng Khám Thiên Đức',
       role: 'lab',
       donVi: 'Phòng Khám Thiên Đức',
@@ -348,7 +336,9 @@ async function seed() {
     if (existing) {
       existing.fullName = item.fullName;
       existing.password = item.password;
+      (existing as any).passwordHint = (item as any).passwordHint || '123456';
       existing.role = item.role as any;
+      (existing as any).title = (item as any).title || '';
       existing.donVi = item.donVi;
       existing.allowedCategories = item.allowedCategories;
       existing.isActive = item.isActive;

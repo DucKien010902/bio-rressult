@@ -42,7 +42,8 @@ export default function PatientInfoCard({
   onPreviewPdf,
   isReleasing = false,
 }: PatientInfoCardProps) {
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
   const isDoctor = currentUser?.role === 'doctor' || currentUser?.role === 'bacsy';
 
   const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTOR_LIST);
@@ -56,17 +57,15 @@ export default function PatientInfoCard({
   }, []);
 
   const inputBaseClass = (disabled: boolean) =>
-    `w-full px-3.5 py-2.5 rounded-xl border transition-all ${
-      disabled
-        ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed select-none'
-        : 'border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3]'
+    `w-full px-3.5 py-2.5 rounded-xl border transition-all ${disabled
+      ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed select-none'
+      : 'border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-medium focus:outline-none focus:border-[#0070f3]'
     }`;
 
   const nameInputClass = (disabled: boolean) =>
-    `w-full px-3.5 py-2.5 rounded-xl border uppercase transition-all ${
-      disabled
-        ? 'border-slate-200 bg-slate-100 text-slate-600 font-bold cursor-not-allowed select-none'
-        : 'border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-bold focus:outline-none focus:border-[#0070f3]'
+    `w-full px-3.5 py-2.5 rounded-xl border uppercase transition-all ${disabled
+      ? 'border-slate-200 bg-slate-100 text-slate-600 font-bold cursor-not-allowed select-none'
+      : 'border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 font-bold focus:outline-none focus:border-[#0070f3]'
     }`;
 
   return (
@@ -224,21 +223,15 @@ export default function PatientInfoCard({
       <div className="text-xs">
         <label className="block text-[11px] font-bold text-sky-700 mb-1 flex items-center justify-between">
           <span>Bác sĩ đọc kết quả (Gán phiếu) *</span>
-          {!isAdmin && (
-            <span className="text-[10px] text-amber-600 font-semibold">
-              (Chỉ Admin mới có quyền phân công / thay đổi)
-            </span>
-          )}
         </label>
         <select
           disabled={!isAdmin}
           value={caseData?.bacSiDoc || 'TS.BS Nguyễn Sỹ Lãnh'}
           onChange={(e) => onChange('bacSiDoc', e.target.value)}
-          className={`w-full sm:w-1/2 px-3.5 py-2.5 rounded-xl border font-bold transition-all ${
-            isAdmin
+          className={`w-full sm:w-1/2 px-3.5 py-2.5 rounded-xl border font-bold transition-all ${isAdmin
               ? 'border-sky-300 bg-sky-50/50 text-slate-900 focus:bg-white focus:outline-none focus:border-[#0070f3] cursor-pointer'
               : 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none'
-          }`}
+            }`}
         >
           {doctorList.map((doc) => (
             <option key={doc.username || doc.fullName} value={doc.fullName}>

@@ -52,7 +52,8 @@ function NewCaseContent() {
 
   // Layout & session states
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -337,18 +338,16 @@ function NewCaseContent() {
                         type="button"
                         key={srv.id}
                         onClick={() => setSelectedCategory(srv.id)}
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#0070f3] text-white shadow-sm ring-2 ring-[#0070f3]/30'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs'
-                        }`}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${isSelected
+                          ? 'bg-[#0070f3] text-white shadow-sm ring-2 ring-[#0070f3]/30'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs'
+                          }`}
                       >
                         <span
-                          className={`w-4 h-4 rounded-full flex items-center justify-center border ${
-                            isSelected
-                              ? 'bg-white text-[#0070f3] border-white'
-                              : 'border-slate-300 bg-white'
-                          }`}
+                          className={`w-4 h-4 rounded-full flex items-center justify-center border ${isSelected
+                            ? 'bg-white text-[#0070f3] border-white'
+                            : 'border-slate-300 bg-white'
+                            }`}
                         >
                           {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
                         </span>
@@ -372,16 +371,14 @@ function NewCaseContent() {
                         type="button"
                         key={cmb.id}
                         onClick={() => setSelectedCategory(cmb.id)}
-                        className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-left ${
-                          isSelected
-                            ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-500 text-orange-900 shadow-sm'
-                            : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs'
-                        }`}
+                        className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-left ${isSelected
+                          ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-500 text-orange-900 shadow-sm'
+                          : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs'
+                          }`}
                       >
                         <Flame
-                          className={`w-4 h-4 shrink-0 ${
-                            isSelected ? 'text-orange-500 fill-orange-500' : 'text-orange-400'
-                          }`}
+                          className={`w-4 h-4 shrink-0 ${isSelected ? 'text-orange-500 fill-orange-500' : 'text-orange-400'
+                            }`}
                         />
                         <span className="truncate">{cmb.label}</span>
                         {isSelected && (
@@ -410,9 +407,6 @@ function NewCaseContent() {
                     <span className="flex items-center gap-1.5">
                       <Building2 className="w-4 h-4 text-purple-600" />
                       <span>Chọn nguồn gửi mẫu / Đơn vị tạo phiếu (Nhập thay cho nguồn):</span>
-                    </span>
-                    <span className="text-[10px] font-extrabold bg-purple-200/80 text-purple-800 px-2 py-0.5 rounded-full">
-                      Chỉ Admin
                     </span>
                   </label>
                   <div className="flex flex-col sm:flex-row gap-2.5">
@@ -546,11 +540,10 @@ function NewCaseContent() {
                     value={formData.donVi}
                     onChange={(e) => handleFieldChange('donVi', e.target.value)}
                     placeholder="Đơn vị gửi mẫu"
-                    className={`w-full px-3.5 py-2.5 rounded-xl border font-medium text-xs sm:text-sm outline-none ${
-                      !isAdmin && currentUser?.role === 'lab'
-                        ? 'bg-slate-100/90 text-slate-600 border-slate-200 cursor-not-allowed select-none'
-                        : 'border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-[#0070f3] focus:border-[#0070f3]'
-                    }`}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border font-medium text-xs sm:text-sm outline-none ${!isAdmin && currentUser?.role === 'lab'
+                      ? 'bg-slate-100/90 text-slate-600 border-slate-200 cursor-not-allowed select-none'
+                      : 'border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-[#0070f3] focus:border-[#0070f3]'
+                      }`}
                   />
                 </div>
 
@@ -582,21 +575,15 @@ function NewCaseContent() {
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
                     <span>Bác sĩ đọc kết quả</span>
-                    {!isAdmin && (
-                      <span className="text-[10px] text-amber-600 font-semibold">
-                        (Chỉ Admin phân công)
-                      </span>
-                    )}
                   </label>
                   <select
                     disabled={!isAdmin}
                     value={formData.bacSiDoc}
                     onChange={(e) => handleFieldChange('bacSiDoc', e.target.value)}
-                    className={`w-full px-3.5 py-2.5 rounded-xl border font-medium text-xs sm:text-sm outline-none transition-all ${
-                      isAdmin
-                        ? 'bg-white text-slate-900 border-slate-200 focus:ring-2 focus:ring-[#0070f3] focus:border-[#0070f3] cursor-pointer'
-                        : 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed select-none'
-                    }`}
+                    className={`w-full px-3.5 py-2.5 rounded-xl border font-medium text-xs sm:text-sm outline-none transition-all ${isAdmin
+                      ? 'bg-white text-slate-900 border-slate-200 focus:ring-2 focus:ring-[#0070f3] focus:border-[#0070f3] cursor-pointer'
+                      : 'bg-slate-100/90 text-slate-500 border-slate-200 cursor-not-allowed select-none'
+                      }`}
                   >
                     <option value="Chưa phân loại">-- Chưa phân công bác sĩ --</option>
                     {doctorList.map((doc) => (

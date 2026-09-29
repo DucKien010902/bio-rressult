@@ -14,7 +14,6 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service.js';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 
 @Controller('users')
 export class UsersController {
@@ -33,7 +32,7 @@ export class UsersController {
         fullName: d.fullName,
         username: d.username,
         passwordHint: d.passwordHint || '123456',
-        isActive: d.isActive,
+        isActive: d.accountActive !== false,
       })),
       sources: sources.map((s: any) => ({
         _id: s._id,
@@ -41,11 +40,14 @@ export class UsersController {
         username: s.username,
         passwordHint: s.passwordHint || '123456',
         donVi: s.donVi,
-        isActive: s.isActive,
+        isActive: s.accountActive !== false,
       })),
     };
   }
 
+  // ==========================================
+  // API QUẢN LÝ DANH SÁCH BÁC SĨ (DOCTOR MASTER DATA)
+  // ==========================================
   @Get('doctors')
   async getDoctors() {
     return this.usersService.getAllDoctors();
@@ -53,12 +55,8 @@ export class UsersController {
 
   @Post('doctors')
   async createDoctor(@Body() body: any) {
-    if (!body.username || !body.fullName) {
-      throw new BadRequestException('Vui lòng nhập Tên đăng nhập và Họ tên bác sĩ');
-    }
-    const existing = await this.usersService.findByUsername(body.username);
-    if (existing) {
-      throw new BadRequestException('Tên đăng nhập đã tồn tại trong hệ thống');
+    if (!body.fullName) {
+      throw new BadRequestException('Vui lòng nhập Họ tên bác sĩ');
     }
     return this.usersService.createDoctor(body);
   }
@@ -67,7 +65,7 @@ export class UsersController {
   async updateDoctor(@Param('id') id: string, @Body() body: any) {
     const updated = await this.usersService.updateDoctor(id, body);
     if (!updated) {
-      throw new NotFoundException('Không tìm thấy tài khoản bác sĩ');
+      throw new NotFoundException('Không tìm thấy thông tin bác sĩ');
     }
     return updated;
   }
@@ -86,7 +84,7 @@ export class UsersController {
 
     const updated = await this.usersService.uploadSignature(id, file.buffer, mimeType, ext);
     if (!updated) {
-      throw new NotFoundException('Không tìm thấy tài khoản bác sĩ');
+      throw new NotFoundException('Không tìm thấy bác sĩ');
     }
     return {
       success: true,
@@ -99,7 +97,7 @@ export class UsersController {
   async deleteSignature(@Param('id') id: string) {
     const updated = await this.usersService.deleteSignature(id);
     if (!updated) {
-      throw new NotFoundException('Không tìm thấy tài khoản bác sĩ');
+      throw new NotFoundException('Không tìm thấy bác sĩ');
     }
     return { success: true, doctor: updated };
   }
@@ -114,7 +112,7 @@ export class UsersController {
   }
 
   // ==========================================
-  // API QUẢN LÝ NGUỒN / ĐƠN VỊ GỬI MẪU (ROLE: LAB)
+  // API QUẢN LÝ DANH SÁCH NGUỒN / ĐƠN VỊ GỬI MẪU
   // ==========================================
   @Get('sources')
   async getSources() {
@@ -123,12 +121,8 @@ export class UsersController {
 
   @Post('sources')
   async createSource(@Body() body: any) {
-    if (!body.username || !body.fullName) {
-      throw new BadRequestException('Vui lòng nhập Tên đăng nhập và Tên đơn vị đối tác');
-    }
-    const existing = await this.usersService.findByUsername(body.username);
-    if (existing) {
-      throw new BadRequestException('Tên đăng nhập đã tồn tại trong hệ thống');
+    if (!body.fullName) {
+      throw new BadRequestException('Vui lòng nhập Tên đơn vị đối tác');
     }
     return this.usersService.createSource(body);
   }
@@ -137,7 +131,7 @@ export class UsersController {
   async updateSource(@Param('id') id: string, @Body() body: any) {
     const updated = await this.usersService.updateSource(id, body);
     if (!updated) {
-      throw new NotFoundException('Không tìm thấy tài khoản nguồn/đơn vị');
+      throw new NotFoundException('Không tìm thấy nguồn/đơn vị');
     }
     return updated;
   }
@@ -147,6 +141,43 @@ export class UsersController {
     const success = await this.usersService.deleteSource(id);
     if (!success) {
       throw new NotFoundException('Không tìm thấy nguồn/đơn vị');
+    }
+    return { success: true };
+  }
+
+  // ==========================================
+  // API QUẢN LÝ TÀI KHOẢN ĐĂNG NHẬP (CHỈ SUPERADMIN)
+  // ==========================================
+  @Get('accounts-list')
+  async getAllAccounts() {
+    return this.usersService.getAllAccounts();
+  }
+
+  @Post('accounts')
+  async createAccount(@Body() body: any) {
+    return this.usersService.createAccount(body);
+  }
+
+  @Put('accounts/:id/toggle-active')
+  async toggleAccountActive(@Param('id') id: string) {
+    const isActive = await this.usersService.toggleAccountActive(id);
+    return { success: true, isActive };
+  }
+
+  @Put('accounts/:id')
+  async updateAccount(@Param('id') id: string, @Body() body: any) {
+    const updated = await this.usersService.updateAccount(id, body);
+    if (!updated) {
+      throw new NotFoundException('Không tìm thấy tài khoản');
+    }
+    return updated;
+  }
+
+  @Delete('accounts/:id')
+  async deleteAccount(@Param('id') id: string) {
+    const success = await this.usersService.deleteAccount(id);
+    if (!success) {
+      throw new NotFoundException('Không tìm thấy tài khoản');
     }
     return { success: true };
   }

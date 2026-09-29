@@ -14,8 +14,10 @@ function SettingsRedirectContent() {
       router.replace('/settings/doctors');
     } else if (tab === 'sources') {
       router.replace('/settings/sources');
-    } else {
+    } else if (tab === 'deadline') {
       router.replace('/settings/deadline');
+    } else {
+      router.replace('/settings/accounts');
     }
   }, [router, searchParams]);
 

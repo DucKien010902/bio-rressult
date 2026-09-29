@@ -1,9 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, XCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { CheckCircle2, XCircle, AlertTriangle, Info, BellRing, ArrowRight, X } from 'lucide-react';
 
-export type ToastType = 'success' | 'error' | 'warning' | 'info';
+export type ToastType = 'success' | 'error' | 'warning' | 'info' | 'notification';
 
 export interface ToastItem {
   id: string;
@@ -11,6 +12,9 @@ export interface ToastItem {
   title?: string;
   message: string;
   duration?: number;
+  actionUrl?: string;
+  actionLabel?: string;
+  onClick?: () => void;
 }
 
 interface ToastContextType {
@@ -19,6 +23,11 @@ interface ToastContextType {
     error: (message: string, title?: string, duration?: number) => void;
     warning: (message: string, title?: string, duration?: number) => void;
     info: (message: string, title?: string, duration?: number) => void;
+    notification: (
+      message: string,
+      title?: string,
+      options?: { duration?: number; actionUrl?: string; actionLabel?: string; onClick?: () => void }
+    ) => void;
   };
   removeToast: (id: string) => void;
 }
@@ -51,6 +60,21 @@ export const toast = {
   },
   info: (message: string, title?: string, duration: number = 3500) => {
     dispatchToast({ type: 'info', message, title: title || 'Thông báo', duration });
+  },
+  notification: (
+    message: string,
+    title?: string,
+    options?: { duration?: number; actionUrl?: string; actionLabel?: string; onClick?: () => void }
+  ) => {
+    dispatchToast({
+      type: 'notification',
+      message,
+      title: title || 'Thông báo mới',
+      duration: options?.duration || 6000,
+      actionUrl: options?.actionUrl,
+      actionLabel: options?.actionLabel,
+      onClick: options?.onClick,
+    });
   },
 };
 
@@ -143,7 +167,8 @@ function ToastCard({
   onDismiss: () => void;
   duration?: number;
 }) {
-  const duration = item.duration || (item.type === 'error' ? 4500 : 3500);
+  const router = useRouter();
+  const duration = item.duration || (item.type === 'error' ? 4500 : item.type === 'notification' ? 6000 : 3500);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -193,19 +218,49 @@ function ToastCard({
       titleColor: 'text-blue-700',
       badge: 'bg-blue-100 text-blue-800',
     },
+    // Thông báo sự kiện hệ thống (Real-time Notification toast)
+    notification: {
+      cardBg: 'bg-white border-blue-200 border-l-[6px] border-l-[#0070f3]',
+      iconBg: 'bg-blue-50 text-[#0070f3] border border-blue-200',
+      progressBar: 'bg-[#0070f3]',
+      icon: BellRing,
+      shadow: 'shadow-2xl shadow-blue-500/25 ring-1 ring-blue-500/10',
+      titleColor: 'text-[#0070f3]',
+      badge: 'bg-blue-100 text-blue-800',
+    },
   }[item.type];
 
   const IconComponent = config.icon;
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button[data-close="true"]')) {
+      return;
+    }
+    if (item.onClick) {
+      item.onClick();
+      onDismiss();
+    } else if (item.actionUrl) {
+      router.push(item.actionUrl);
+      onDismiss();
+    }
+  };
+
+  const isClickable = Boolean(item.onClick || item.actionUrl);
+
   return (
     <div
-      className={`pointer-events-auto relative overflow-hidden rounded-2xl border p-4 backdrop-blur-md transition-all duration-300 animate-in slide-in-from-top-3 fade-in ${config.cardBg} ${config.shadow}`}
+      onClick={handleCardClick}
+      className={`pointer-events-auto relative overflow-hidden rounded-2xl border p-4 backdrop-blur-md transition-all duration-300 animate-in slide-in-from-top-3 fade-in ${config.cardBg} ${config.shadow} ${
+        isClickable ? 'cursor-pointer hover:scale-[1.01] hover:shadow-2xl' : ''
+      }`}
       style={{ minWidth: '320px' }}
     >
       <div className="flex items-start gap-3">
         {/* Icon Pill */}
         <div
-          className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ${config.iconBg}`}
+          className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ${config.iconBg} ${
+            item.type === 'notification' ? 'animate-bounce' : ''
+          }`}
         >
           <IconComponent className="w-5 h-5" />
         </div>
@@ -220,12 +275,23 @@ function ToastCard({
           <p className="text-xs font-semibold text-slate-700 leading-snug">
             {item.message}
           </p>
+
+          {item.actionUrl && (
+            <div className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-bold text-[#0070f3] hover:underline">
+              <span>{item.actionLabel || 'Xem phiếu xét nghiệm'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </div>
+          )}
         </div>
 
         {/* Close Button */}
         <button
           type="button"
-          onClick={onDismiss}
+          data-close="true"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDismiss();
+          }}
           className="absolute top-3 right-3 p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
           title="Đóng thông báo"
         >

@@ -43,7 +43,8 @@ export default function HpvResultCard({
   isCombo = false,
   currentUser,
 }: HpvResultCardProps) {
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
   const isLab = currentUser?.role === 'lab';
   const [collapsed, setCollapsed] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -67,8 +68,8 @@ export default function HpvResultCard({
   const testTitle = isHpv40
     ? 'KẾT QUẢ XÉT NGHIỆM HPV 40 TYPES (REAL-TIME PCR)'
     : isHpv23
-    ? 'KẾT QUẢ XÉT NGHIỆM HPV 23 TYPES (REAL-TIME PCR)'
-    : 'KẾT QUẢ XÉT NGHIỆM HPV 20 TYPES (REAL-TIME PCR)';
+      ? 'KẾT QUẢ XÉT NGHIỆM HPV 23 TYPES (REAL-TIME PCR)'
+      : 'KẾT QUẢ XÉT NGHIỆM HPV 20 TYPES (REAL-TIME PCR)';
 
   // Xóa ảnh khỏi MinIO & CSDL Mongo
   const handleDeleteImage = async (field: string = 'anhHpv') => {
@@ -224,9 +225,8 @@ export default function HpvResultCard({
                 value={caseData?.hpvHighRiskResult || 'Âm tính'}
                 onChange={(e) => onChange('hpvHighRiskResult', e.target.value)}
                 placeholder="Âm tính / Dương tính..."
-                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${
-                  isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
-                }`}
+                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
+                  }`}
               />
             </div>
 
@@ -248,9 +248,8 @@ export default function HpvResultCard({
                 value={caseData?.hpvHighRiskOtherResult || 'Âm tính'}
                 onChange={(e) => onChange('hpvHighRiskOtherResult', e.target.value)}
                 placeholder="Âm tính / Dương tính..."
-                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${
-                  isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
-                }`}
+                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
+                  }`}
               />
             </div>
 
@@ -271,9 +270,8 @@ export default function HpvResultCard({
                   value={caseData?.hpvOtherTypesResult || 'Âm tính'}
                   onChange={(e) => onChange('hpvOtherTypesResult', e.target.value)}
                   placeholder="Âm tính / Dương tính..."
-                  className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${
-                    isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
-                  }`}
+                  className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-red-200 font-bold text-xs text-red-700 text-center ${isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-red-50/50 focus:outline-none focus:border-red-400'
+                    }`}
                 />
               </div>
             )}
@@ -294,9 +292,8 @@ export default function HpvResultCard({
                 value={caseData?.hpvLowRiskResult || 'Âm tính'}
                 onChange={(e) => onChange('hpvLowRiskResult', e.target.value)}
                 placeholder="Âm tính / Dương tính..."
-                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-sky-200 font-bold text-xs text-sky-700 text-center ${
-                  isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-sky-50/50 focus:outline-none focus:border-sky-400'
-                }`}
+                className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-sky-200 font-bold text-xs text-sky-700 text-center ${isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-sky-50/50 focus:outline-none focus:border-sky-400'
+                  }`}
               />
             </div>
 
@@ -317,9 +314,8 @@ export default function HpvResultCard({
                   value={caseData?.hpvOtherTypesResult || 'Âm tính'}
                   onChange={(e) => onChange('hpvOtherTypesResult', e.target.value)}
                   placeholder="Âm tính / Dương tính..."
-                  className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-slate-200 font-bold text-xs text-slate-700 text-center ${
-                    isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-white focus:outline-none focus:border-slate-400'
-                  }`}
+                  className={`w-full sm:w-48 px-3.5 py-1.5 rounded-lg border border-slate-200 font-bold text-xs text-slate-700 text-center ${isLab ? 'bg-slate-100 cursor-not-allowed select-none' : 'bg-white focus:outline-none focus:border-slate-400'
+                    }`}
                 />
               </div>
             )}
@@ -434,11 +430,10 @@ export default function HpvResultCard({
                   `ÂM TÍNH VỚI VIRUS HPV (${isHpv40 ? '40' : isHpv23 ? '23' : '20'} TYPE TRÊN) TRÊN MẪU NHẬN ĐƯỢC.`
                 }
                 onChange={(e) => onChange('ketLuan', e.target.value)}
-                className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all ${
-                  isLab
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all ${isLab
                     ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
                     : 'border-indigo-200 bg-indigo-50/40 text-indigo-950 focus:bg-white focus:outline-none focus:border-[#0070f3]'
-                }`}
+                  }`}
               />
             </div>
 
@@ -452,11 +447,10 @@ export default function HpvResultCard({
                 value={caseData?.khuyenNghi || ''}
                 onChange={(e) => onChange('khuyenNghi', e.target.value)}
                 placeholder="Để trống sẽ mặc định in 'Không có' trên phiếu..."
-                className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-medium transition-all ${
-                  isLab
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-medium transition-all ${isLab
                     ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed select-none'
                     : 'border-slate-200 bg-slate-50/50 text-slate-800 focus:bg-white focus:outline-none focus:border-[#0070f3]'
-                }`}
+                  }`}
               />
             </div>
           </div>
@@ -467,21 +461,15 @@ export default function HpvResultCard({
               <div>
                 <span className="text-xs text-indigo-800 font-bold block mb-1">
                   {isCombo ? 'Bác sĩ đọc HPV (Phần 1):' : 'Bác sĩ đọc kết quả:'}
-                  {!isAdmin && (
-                    <span className="text-[10px] text-amber-600 font-normal ml-2">
-                      (Chỉ Admin đổi)
-                    </span>
-                  )}
                 </span>
                 <select
                   disabled={!isAdmin}
                   value={caseData?.bacSiDoc || 'TS . BS Nguyễn Khánh Dương'}
                   onChange={(e) => onChange('bacSiDoc', e.target.value)}
-                  className={`form-select text-xs py-1.5 px-3 font-bold rounded-lg border shadow-2xs ${
-                    isAdmin
+                  className={`form-select text-xs py-1.5 px-3 font-bold rounded-lg border shadow-2xs ${isAdmin
                       ? 'text-sky-700 border-sky-300 bg-white focus:outline-none focus:border-indigo-500 cursor-pointer'
                       : 'text-slate-600 border-slate-200 bg-slate-100 cursor-not-allowed select-none'
-                  }`}
+                    }`}
                 >
                   {doctorList.map((doc) => (
                     <option key={doc.username || doc.fullName} value={doc.fullName}>
@@ -504,9 +492,8 @@ export default function HpvResultCard({
                       : new Date().toISOString().split('T')[0]
                   }
                   onChange={(e) => onChange('ngayTraKetQua', e.target.value)}
-                  className={`text-xs py-1 px-2.5 font-bold rounded-lg border-indigo-300 shadow-2xs w-44 ${
-                    isLab ? 'bg-slate-100 text-slate-500 cursor-not-allowed select-none' : 'bg-white text-slate-800 cursor-pointer'
-                  }`}
+                  className={`text-xs py-1 px-2.5 font-bold rounded-lg border-indigo-300 shadow-2xs w-44 ${isLab ? 'bg-slate-100 text-slate-500 cursor-not-allowed select-none' : 'bg-white text-slate-800 cursor-pointer'
+                    }`}
                 />
               </div>
 
@@ -538,11 +525,10 @@ export default function HpvResultCard({
                   <button
                     type="button"
                     onClick={() => onToggleSign && onToggleSign(1)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
-                      caseData?.daKy
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${caseData?.daKy
                         ? 'bg-amber-500 hover:bg-amber-600 text-white'
                         : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    }`}
+                      }`}
                   >
                     {caseData?.daKy ? (
                       <>

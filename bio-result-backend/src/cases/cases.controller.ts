@@ -290,8 +290,8 @@ export class CasesController {
     if (req.user?.role === 'lab' && req.user.donVi) {
       data.donVi = req.user.donVi;
     }
-    // Chỉ có Admin mới có quyền gán bác sĩ đọc KQ khi tạo mới
-    if (req.user?.role !== 'admin') {
+    // Chỉ có Admin & Super Admin mới có quyền gán bác sĩ đọc KQ khi tạo mới
+    if (req.user?.role !== 'admin' && req.user?.role !== 'superadmin') {
       delete data.bacSiDoc;
       delete data.bacSiDoc2;
       delete data.doctorName;
@@ -391,8 +391,8 @@ export class CasesController {
       }
     }
 
-    // 3. Chỉ có Admin mới có quyền thay đổi bác sĩ đọc KQ và xác nhận trả kết quả
-    if (role !== 'admin') {
+    // 3. Chỉ có Admin & Super Admin mới có quyền thay đổi bác sĩ đọc KQ và xác nhận trả kết quả
+    if (role !== 'admin' && role !== 'superadmin') {
       delete data.bacSiDoc;
       delete data.bacSiDoc2;
       delete data.doctorName;
@@ -440,12 +440,14 @@ export class CasesController {
     return this.casesService.signAndDiagnose(id, body);
   }
 
-  // Admin duyệt và Trả kết quả (da_tra_ket_qua) sau khi Bác sĩ đã ký
+  // Admin / Super Admin duyệt và Trả kết quả (da_tra_ket_qua) sau khi Bác sĩ đã ký
   @Patch(':id/release')
   async releaseResult(@Req() req: any, @Param('id') id: string) {
-    if (req.user?.role !== 'admin' && req.user?.username !== 'admin') {
+    const isSuper = req.user?.role === 'superadmin' || req.user?.username === 'superadmin';
+    const isAdmin = req.user?.role === 'admin' || req.user?.username === 'admin' || isSuper;
+    if (!isAdmin) {
       throw new ForbiddenException(
-        'Chỉ tài khoản Quản trị (Admin) mới có quyền xác nhận trả kết quả!',
+        'Chỉ tài khoản Quản trị (Admin/Super Admin) mới có quyền xác nhận trả kết quả!',
       );
     }
     return this.casesService.releaseResult(id);
@@ -575,9 +577,11 @@ export class CasesController {
 
   @Delete(':id')
   async delete(@Req() req: any, @Param('id') id: string) {
-    if (req.user?.role !== 'admin') {
+    const isSuper = req.user?.role === 'superadmin' || req.user?.username === 'superadmin';
+    const isAdmin = req.user?.role === 'admin' || req.user?.username === 'admin' || isSuper;
+    if (!isAdmin) {
       throw new ForbiddenException(
-        'Chỉ có Quản trị viên phòng Lab (Admin) mới có quyền xóa phiếu xét nghiệm!',
+        'Chỉ có Quản trị viên phòng Lab (Admin/Super Admin) mới có quyền xóa phiếu xét nghiệm!',
       );
     }
     return this.casesService.delete(id);

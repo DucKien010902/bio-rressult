@@ -54,7 +54,8 @@ export default function CaseDetailPage() {
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
 
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
   const isDoctor = currentUser?.role === 'doctor' || currentUser?.role === 'bacsy';
   const isLab = currentUser?.role === 'lab';
 
@@ -242,9 +243,10 @@ export default function CaseDetailPage() {
   // Admin duyệt và Xác nhận trả kết quả (hoặc Hủy trả kết quả)
   const handleReleaseResult = async () => {
     if (!caseData || !id) return;
-    const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+    const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
+    const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
     if (!isAdmin) {
-      toast.warning('Chỉ Quản trị viên (Admin) mới có quyền xác nhận trả kết quả!', 'Từ chối quyền');
+      toast.warning('Chỉ Quản trị viên (Admin/Super Admin) mới có quyền xác nhận trả kết quả!', 'Từ chối quyền');
       return;
     }
 

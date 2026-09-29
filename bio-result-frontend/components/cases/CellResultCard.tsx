@@ -83,7 +83,8 @@ export default function CellResultCard({
   isCombo = false,
   currentUser,
 }: CellResultCardProps) {
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
   const isLab = currentUser?.role === 'lab';
   const [collapsed, setCollapsed] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -312,11 +313,10 @@ export default function CellResultCard({
           {/* Section 2: NILM & Tế bào bất thường khác */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <label
-              className={`p-3.5 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                caseData?.khongTonThuong
+              className={`p-3.5 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${caseData?.khongTonThuong
                   ? 'border-[#0070f3] bg-blue-50/50 font-bold text-[#0070f3]'
                   : 'border-slate-200 bg-slate-50/40 text-slate-700 hover:border-slate-300'
-              }`}
+                }`}
             >
               <input
                 type="checkbox"
@@ -328,11 +328,10 @@ export default function CellResultCard({
             </label>
 
             <label
-              className={`p-3.5 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                caseData?.batThuongKhac
+              className={`p-3.5 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${caseData?.batThuongKhac
                   ? 'border-[#0070f3] bg-blue-50/50 font-bold text-[#0070f3]'
                   : 'border-slate-200 bg-slate-50/40 text-slate-700 hover:border-slate-300'
-              }`}
+                }`}
             >
               <input
                 type="checkbox"
@@ -344,11 +343,10 @@ export default function CellResultCard({
             </label>
 
             <label
-              className={`p-3.5 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                caseData?.teBaoNoiMac
+              className={`p-3.5 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${caseData?.teBaoNoiMac
                   ? 'border-[#0070f3] bg-blue-50/50 font-bold text-[#0070f3]'
                   : 'border-slate-200 bg-slate-50/40 text-slate-700 hover:border-slate-300'
-              }`}
+                }`}
             >
               <input
                 type="checkbox"
@@ -371,11 +369,10 @@ export default function CellResultCard({
                 return (
                   <label
                     key={item.value}
-                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                      checked
+                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${checked
                         ? 'border-[#0070f3] bg-blue-50/50 font-bold text-[#0070f3]'
                         : 'border-slate-200 bg-slate-50/30 text-slate-700 hover:border-slate-300'
-                    }`}
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -384,9 +381,8 @@ export default function CellResultCard({
                       className="w-4 h-4 rounded text-[#0070f3] focus:ring-[#0070f3]"
                     />
                     <span
-                      className={`text-xs ${
-                        item.value === 'hpv' || item.value === 'tapKhuan' ? '' : 'italic'
-                      }`}
+                      className={`text-xs ${item.value === 'hpv' || item.value === 'tapKhuan' ? '' : 'italic'
+                        }`}
                     >
                       {item.label}
                     </span>
@@ -407,11 +403,10 @@ export default function CellResultCard({
                 return (
                   <label
                     key={item.value}
-                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                      checked
+                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${checked
                         ? 'border-[#0070f3] bg-blue-50/50 font-bold text-[#0070f3]'
                         : 'border-slate-200 bg-slate-50/30 text-slate-700 hover:border-slate-300'
-                    }`}
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -437,11 +432,10 @@ export default function CellResultCard({
                 return (
                   <label
                     key={item.value}
-                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                      checked
+                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${checked
                         ? 'border-[#0070f3] bg-blue-50/50 font-bold text-[#0070f3]'
                         : 'border-slate-200 bg-slate-50/30 text-slate-700 hover:border-slate-300'
-                    }`}
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -467,11 +461,10 @@ export default function CellResultCard({
                 return (
                   <label
                     key={item.value}
-                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
-                      checked
+                    className={`p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${checked
                         ? 'border-[#0070f3] bg-blue-50/50 font-bold text-[#0070f3]'
                         : 'border-slate-200 bg-slate-50/30 text-slate-700 hover:border-slate-300'
-                    }`}
+                      }`}
                   >
                     <input
                       type="checkbox"
@@ -604,21 +597,15 @@ export default function CellResultCard({
               <div>
                 <span className="text-xs text-purple-800 font-bold block mb-1">
                   {isCombo ? 'Bác sĩ đọc Tế bào (Phần 2):' : 'Bác sĩ đọc kết quả:'}
-                  {!isAdmin && (
-                    <span className="text-[10px] text-amber-600 font-normal ml-2">
-                      (Chỉ Admin đổi)
-                    </span>
-                  )}
                 </span>
                 <select
                   disabled={!isAdmin}
                   value={(isCombo ? (caseData?.bacSiDoc2 || caseData?.bacSiDoc) : caseData?.bacSiDoc) || 'BS CK1 PHẠM THẾ HÙNG'}
                   onChange={(e) => onChange(isCombo ? 'bacSiDoc2' : 'bacSiDoc', e.target.value)}
-                  className={`form-select text-xs py-1.5 px-3 font-bold rounded-lg border shadow-2xs ${
-                    isAdmin
+                  className={`form-select text-xs py-1.5 px-3 font-bold rounded-lg border shadow-2xs ${isAdmin
                       ? 'text-purple-700 border-purple-300 bg-white focus:outline-none focus:border-purple-500 cursor-pointer'
                       : 'text-slate-600 border-slate-200 bg-slate-100 cursor-not-allowed select-none'
-                  }`}
+                    }`}
                 >
                   {doctorList.map((doc) => (
                     <option key={doc.username || doc.fullName} value={doc.fullName}>
@@ -641,9 +628,8 @@ export default function CellResultCard({
                       : new Date().toISOString().split('T')[0]
                   }
                   onChange={(e) => onChange(isCombo ? 'ngayXetNghiem2' : 'ngayTraKetQua', e.target.value)}
-                  className={`text-xs py-1.5 px-3 font-bold rounded-lg border-purple-300 shadow-2xs ${
-                    isLab ? 'bg-slate-100 text-slate-500 cursor-not-allowed select-none' : 'bg-white text-purple-700 cursor-pointer'
-                  }`}
+                  className={`text-xs py-1.5 px-3 font-bold rounded-lg border-purple-300 shadow-2xs ${isLab ? 'bg-slate-100 text-slate-500 cursor-not-allowed select-none' : 'bg-white text-purple-700 cursor-pointer'
+                    }`}
                 />
               </div>
 
@@ -675,11 +661,10 @@ export default function CellResultCard({
                   <button
                     type="button"
                     onClick={() => onToggleSign && onToggleSign(isCombo ? 2 : 1)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
-                      (isCombo ? caseData?.daKy2 : caseData?.daKy)
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${(isCombo ? caseData?.daKy2 : caseData?.daKy)
                         ? 'bg-amber-500 hover:bg-amber-600 text-white'
                         : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    }`}
+                      }`}
                   >
                     {(isCombo ? caseData?.daKy2 : caseData?.daKy) ? (
                       <>

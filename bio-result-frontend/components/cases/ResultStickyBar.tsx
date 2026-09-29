@@ -29,7 +29,8 @@ export default function ResultStickyBar({
   isReleasing = false,
   isDownloading = false,
 }: ResultStickyBarProps) {
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
   const isCombo = caseData?.loaiXetNghiem?.startsWith('combo_');
   const isSigned = isCombo
     ? !!(caseData?.daKy && caseData?.daKy2)

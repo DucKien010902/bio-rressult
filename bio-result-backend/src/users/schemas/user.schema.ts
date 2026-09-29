@@ -1,9 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
-export type UserRole = 'admin' | 'doctor' | 'bacsy' | 'lab';
+export type UserRole = 'superadmin' | 'admin' | 'doctor' | 'bacsy' | 'lab';
 
-@Schema({ timestamps: true })
+@Schema({ timestamps: true, collection: 'users' })
 export class User extends Document {
   @Prop({ required: true, unique: true })
   username!: string;
@@ -17,7 +17,7 @@ export class User extends Document {
   @Prop({
     type: String,
     required: true,
-    enum: ['admin', 'doctor', 'bacsy', 'lab'],
+    enum: ['superadmin', 'admin', 'doctor', 'bacsy', 'lab'],
     default: 'doctor',
   })
   role!: UserRole;
@@ -26,7 +26,7 @@ export class User extends Document {
   donVi!: string; // Tên bệnh viện / phòng khám nếu là tài khoản lab/đơn vị gửi mẫu
 
   @Prop({ default: '' })
-  title?: string; // Chức danh / Đơn vị (hiển thị dưới tên bác sĩ trên phiếu)
+  title?: string; // Chức danh / Đơn vị
 
   @Prop({ default: '' })
   signatureUrl?: string; // Link ảnh chữ ký số lưu trên MinIO
@@ -38,19 +38,25 @@ export class User extends Document {
   email?: string;
 
   @Prop({ default: '' })
-  chungChiHanhNghe?: string; // Số chứng chỉ hành nghề nếu có
+  chungChiHanhNghe?: string;
 
   @Prop({ default: '' })
-  diaChi?: string; // Địa chỉ đơn vị / cơ sở đối tác gửi mẫu
+  diaChi?: string;
 
   @Prop({ type: [String], default: [] })
-  allowedCategories!: string[]; // Danh mục dịch vụ được phép thực hiện / đọc KQ
+  allowedCategories!: string[];
 
   @Prop({ default: true })
   isActive!: boolean;
 
   @Prop({ default: '' })
-  passwordHint?: string; // Gợi ý mật khẩu plain-text (chỉ dùng cho hiển thị trong admin UI / modal đăng nhập)
+  passwordHint?: string; // Gợi ý mật khẩu plain-text
+
+  @Prop({ type: Types.ObjectId, ref: 'Doctor', default: null })
+  doctorId?: Types.ObjectId; // Liên kết tới hồ sơ bác sĩ (nếu là tài khoản bác sĩ)
+
+  @Prop({ type: Types.ObjectId, ref: 'Source', default: null })
+  sourceId?: Types.ObjectId; // Liên kết tới hồ sơ nguồn gửi mẫu (nếu là tài khoản lab)
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

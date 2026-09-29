@@ -51,8 +51,8 @@ function SettingsDeadlineContent() {
     }
     try {
       const parsed = JSON.parse(rawUser);
-      if (parsed.role !== 'admin') {
-        toast.warning('Bạn không có quyền truy cập trang Cài đặt!', 'Từ chối');
+      if (parsed.role !== 'superadmin' && parsed.username !== 'superadmin') {
+        toast.warning('Chỉ Super Admin mới có quyền truy cập trang Cài đặt thời gian!', 'Từ chối');
         router.push('/');
         return;
       }

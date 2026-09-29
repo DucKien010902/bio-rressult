@@ -248,23 +248,40 @@ export default function LoginPage() {
                 </div>
               ) : (
                 <>
-                  {/* Nhóm 1: Admin */}
+                  {/* Nhóm 1: Super Admin & Admin */}
                   <div>
-                    <div className="text-[11px] font-bold text-blue-800 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                      <Shield className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Quản trị phòng Lab (Toàn quyền):</span>
+                    <div className="text-[11px] font-bold text-purple-800 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Quản trị hệ thống (Super Admin & Admin):</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleQuickLogin('admin_lab', '210577')}
-                      className="w-full p-3 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 transition-all text-left flex items-center justify-between group cursor-pointer"
-                    >
-                      <div>
-                        <div className="font-bold text-blue-900 text-xs sm:text-sm">Admin phòng Lab</div>
-                        <div className="text-[11px] text-blue-600 mt-0.5 font-mono">admin_lab &bull; 210577</div>
-                      </div>
-                      <span className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity font-bold">Vào ngay &rarr;</span>
-                    </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleQuickLogin('superadmin', '210577')}
+                        className="p-3 rounded-xl border border-purple-200 bg-purple-50/70 hover:bg-purple-100 transition-all text-left flex items-center justify-between group cursor-pointer"
+                      >
+                        <div>
+                          <div className="font-bold text-purple-950 text-xs sm:text-sm flex items-center gap-1.5">
+                            <span>Super Admin</span>
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-purple-200 text-purple-800">Cài đặt</span>
+                          </div>
+                          <div className="text-[11px] text-purple-600 mt-0.5 font-mono">superadmin &bull; 210577</div>
+                        </div>
+                        <span className="text-[11px] bg-purple-600 text-white px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity font-bold">Vào &rarr;</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuickLogin('admin_lab', '210577')}
+                        className="p-3 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 transition-all text-left flex items-center justify-between group cursor-pointer"
+                      >
+                        <div>
+                          <div className="font-bold text-blue-900 text-xs sm:text-sm">Admin phòng Lab</div>
+                          <div className="text-[11px] text-blue-600 mt-0.5 font-mono">admin_lab &bull; 210577</div>
+                        </div>
+                        <span className="text-[11px] bg-blue-600 text-white px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity font-bold">Vào &rarr;</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Nhóm 2: Bác sĩ */}

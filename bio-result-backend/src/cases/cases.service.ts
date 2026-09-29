@@ -153,24 +153,45 @@ export class CasesService {
     });
     const saved = await newCase.save();
 
-    // 1. Khi nguồn tạo đơn -> Thông báo tới Admin để còn biết nhận mẫu
+    // 1. Khi nguồn tạo đơn -> Thông báo tới Admin để còn biết nhận mẫu (nếu chính Admin tạo thì không tự thông báo cho chính mình)
     try {
-      const sourceName =
-        saved.donVi ||
-        (creatorUser?.role === 'lab' ? creatorUser.donVi : '') ||
-        saved.nguoiNhap ||
-        'Nguồn gửi mẫu';
+      const isCreatedByAdmin =
+        creatorUser?.role === 'admin' ||
+        creatorUser?.role === 'superadmin' ||
+        creatorUser?.username === 'admin' ||
+        creatorUser?.username === 'superadmin';
+      if (!isCreatedByAdmin) {
+        const sourceName =
+          saved.donVi ||
+          (creatorUser?.role === 'lab' ? creatorUser.donVi : '') ||
+          saved.nguoiNhap ||
+          'Nguồn gửi mẫu';
 
-      await this.notificationsService.createNotification({
-        title: `Đơn xét nghiệm mới cần nhận mẫu: ${saved.maSo}`,
-        message: `Đơn vị "${sourceName}" vừa tạo đơn xét nghiệm cho bệnh nhân ${saved.hoTen} (${saved.maSo}) - Dịch vụ: ${this.getCategoryLabel(saved.loaiXetNghiem)}. Vui lòng kiểm tra và tiếp nhận mẫu.`,
-        testResultId: saved._id.toString(),
-        caseCode: saved.maSo,
-        patientName: saved.hoTen,
-        sourceName: saved.donVi || sourceName,
-        recipientRole: 'admin',
-        type: 'new_order',
-      });
+        await this.notificationsService.createNotification({
+          title: `Đơn xét nghiệm mới cần nhận mẫu: ${saved.maSo}`,
+          message: `Đơn vị "${sourceName}" vừa tạo đơn xét nghiệm cho bệnh nhân ${saved.hoTen} (${saved.maSo}) - Dịch vụ: ${this.getCategoryLabel(saved.loaiXetNghiem)}. Vui lòng kiểm tra và tiếp nhận mẫu.`,
+          testResultId: saved._id.toString(),
+          caseCode: saved.maSo,
+          patientName: saved.hoTen,
+          sourceName: saved.donVi || sourceName,
+          recipientRole: 'admin',
+          type: 'new_order',
+        });
+      }
+
+      // Nếu khi tạo đơn đã chỉ định sẵn bác sĩ đọc -> Thông báo tới Bác sĩ đó
+      if (saved.bacSiDoc) {
+        await this.notificationsService.createNotification({
+          title: `Bạn có ca xét nghiệm mới cần đọc KQ: ${saved.maSo}`,
+          message: `Bạn được phân công đọc kết quả xét nghiệm cho bệnh nhân ${saved.hoTen} (${saved.maSo}) - Dịch vụ: ${this.getCategoryLabel(saved.loaiXetNghiem)}. Vui lòng kiểm tra và chẩn đoán.`,
+          testResultId: saved._id.toString(),
+          caseCode: saved.maSo,
+          patientName: saved.hoTen,
+          doctorName: saved.bacSiDoc,
+          recipientRole: 'doctor',
+          type: 'doctor_assigned',
+        });
+      }
     } catch (err) {
       console.error('[CasesService.create] Lỗi tạo thông báo:', err);
     }

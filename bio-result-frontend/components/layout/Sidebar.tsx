@@ -59,9 +59,10 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
 
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
   const isLab = currentUser?.role === 'lab';
-  // Chỉ Admin và tài khoản nguồn (lab) mới được tạo mẫu
+  // Chỉ Admin, Super Admin và tài khoản nguồn (lab) mới được tạo mẫu
   const canCreate = isAdmin || isLab;
 
   return (
@@ -160,7 +161,9 @@ export default function Sidebar({
                 {currentUser?.fullName || 'Admin phòng Lab'}
               </div>
               <div className="text-xs text-slate-600 truncate mt-0.5 font-bold">
-                {currentUser?.role === 'admin'
+                {isSuperAdmin
+                  ? 'Super Admin'
+                  : isAdmin
                   ? 'Quản lý Lab'
                   : currentUser?.role === 'doctor'
                   ? 'Bác sĩ đọc KQ'

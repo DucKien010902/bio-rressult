@@ -18,6 +18,7 @@ const getImgUrl = (url: string) => {
 import { toast } from '@/components/common/Toast';
 import {
   UserCheck,
+  KeyRound,
   Building2,
   CheckCircle2,
   AlertTriangle,
@@ -95,8 +96,8 @@ function SettingsDoctorsContent() {
     }
     try {
       const parsed = JSON.parse(rawUser);
-      if (parsed.role !== 'admin') {
-        toast.warning('Bạn không có quyền truy cập trang Cài đặt!', 'Từ chối');
+      if (parsed.role !== 'superadmin' && parsed.username !== 'superadmin') {
+        toast.warning('Chỉ Super Admin mới có quyền truy cập trang Cài đặt Bác sĩ!', 'Từ chối');
         router.push('/');
         return;
       }
@@ -478,20 +479,19 @@ function SettingsDoctorsContent() {
                           )}
                         </div>
 
-                        {/* Credentials */}
-                        <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 space-y-1.5">
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="text-slate-400 font-semibold w-16 shrink-0">Tài khoản:</span>
-                            <span className="font-mono font-bold text-[#0070f3] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                        {/* Account Status */}
+                        <div className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between text-xs">
+                          <span className="text-slate-500 font-bold">Tài khoản đăng nhập:</span>
+                          {doc.hasAccount ? (
+                            <span className="inline-flex items-center gap-1 font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              <KeyRound className="w-3 h-3 text-blue-500" />
                               {doc.username}
                             </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="text-slate-400 font-semibold w-16 shrink-0">Mật khẩu:</span>
-                            <span className="font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                              {doc.passwordHint || '••••••'}
+                          ) : (
+                            <span className="text-[11px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                              Chưa cấp tài khoản
                             </span>
-                          </div>
+                          )}
                         </div>
                       </div>
 
@@ -581,23 +581,8 @@ function SettingsDoctorsContent() {
                 </div>
               </div>
 
-              {/* Mật khẩu & Số điện thoại */}
+              {/* Số điện thoại & Email */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Mật khẩu {isEditModalOpen && <span className="text-slate-400 font-normal">(bỏ trống nếu giữ nguyên)</span>}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      placeholder={isEditModalOpen ? '••••••••' : 'Mặc định: 123456'}
-                      value={doctorForm.password}
-                      onChange={(e) => setDoctorForm({ ...doctorForm, password: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-900 focus:outline-none focus:border-[#0070f3] focus:ring-2 focus:ring-blue-500/20 pl-9"
-                    />
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  </div>
-                </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     Số điện thoại liên hệ
@@ -611,6 +596,21 @@ function SettingsDoctorsContent() {
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-900 focus:outline-none focus:border-[#0070f3] focus:ring-2 focus:ring-blue-500/20 pl-9"
                     />
                     <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Email liên hệ
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="email"
+                      placeholder="bacsi@benhvien.vn"
+                      value={doctorForm.email || ''}
+                      onChange={(e) => setDoctorForm({ ...doctorForm, email: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-900 focus:outline-none focus:border-[#0070f3] focus:ring-2 focus:ring-blue-500/20 pl-9"
+                    />
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   </div>
                 </div>
               </div>

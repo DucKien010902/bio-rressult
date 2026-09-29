@@ -19,6 +19,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from '@/components/common/Toast';
 
@@ -275,7 +276,8 @@ export default function CaseTable({
   const [openActionId, setOpenActionId] = useState<string | null>(null);
 
   // Admin permission
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
 
   // Accept sample modal states
   const [showAcceptModal, setShowAcceptModal] = useState(false);
@@ -296,7 +298,8 @@ export default function CaseTable({
         setShowAcceptModal(false);
         toast.success('Đã tiếp nhận ca xét nghiệm thành công!', 'Tiếp nhận thành công');
         if (goToDetail) {
-          router.push(`/results/${selectedCaseForAccept._id}`);
+          window.open(`/results/${selectedCaseForAccept._id}`, '_blank');
+          onRefresh();
         } else {
           onRefresh();
         }
@@ -670,12 +673,24 @@ export default function CaseTable({
                   return (
                     <tr
                       key={item._id}
-                      onClick={() => router.push(`/results/${item._id}`)}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('a')) {
+                          return;
+                        }
+                        window.open(`/results/${item._id}`, '_blank');
+                      }}
                       className={`${rowBgClass} transition-colors cursor-pointer group`}
                     >
                       {/* Mã số */}
-                      <td className={`py-3.5 px-4 font-bold text-[#0070f3] hover:underline relative ${firstCellBorder}`}>
-                        <span className="block leading-tight">{item.maSo}</span>
+                      <td className={`py-3.5 px-4 font-bold text-[#0070f3] relative ${firstCellBorder}`}>
+                        <Link
+                          href={`/results/${item._id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block leading-tight hover:underline focus:outline-none"
+                        >
+                          {item.maSo}
+                        </Link>
                         {item.loaiXetNghiem && (
                           <span className="inline-block text-[10px] font-semibold text-slate-500 bg-slate-100/90 border border-slate-200/80 px-1.5 py-0.5 rounded-md mt-1 select-none">
                             {CATEGORY_NAMES_MAP[item.loaiXetNghiem] || item.loaiXetNghiem}
@@ -685,7 +700,14 @@ export default function CaseTable({
 
                       {/* Họ và tên */}
                       <td className="py-3.5 px-4 font-bold text-slate-900 uppercase">
-                        {item.hoTen}
+                        <Link
+                          href={`/results/${item._id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-[#0070f3] hover:underline focus:outline-none block"
+                        >
+                          {item.hoTen}
+                        </Link>
                       </td>
 
                       {/* Năm sinh */}
@@ -864,17 +886,29 @@ export default function CaseTable({
                               </span>
                             </button>
 
+                            {/* 1.5 Mở trong tab mới */}
+                            <Link
+                              href={`/results/${item._id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => setOpenActionId(null)}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-blue-50 hover:text-[#0070f3] transition-colors cursor-pointer"
+                            >
+                              <ExternalLink className="w-4 h-4 text-[#0070f3]" />
+                              <span>Mở trong tab mới</span>
+                            </Link>
+
                             {/* 2. Sửa thông tin phiếu */}
-                            <button
-                              onClick={() => {
-                                setOpenActionId(null);
-                                router.push(`/results/${item._id}`);
-                              }}
+                            <Link
+                              href={`/results/${item._id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => setOpenActionId(null)}
                               className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-purple-600 transition-colors cursor-pointer"
                             >
                               <Edit3 className="w-4 h-4 text-purple-600" />
                               <span>Sửa thông tin phiếu</span>
-                            </button>
+                            </Link>
 
                             {/* 3. Xóa phiếu (Chỉ dành cho Admin phòng Lab) */}
                             {isAdmin && (

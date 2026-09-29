@@ -34,7 +34,8 @@ export default function SoituoiResultCard({
   isSaving = false,
   currentUser,
 }: SoituoiResultCardProps) {
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin';
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
   const isLab = currentUser?.role === 'lab';
   const [collapsed, setCollapsed] = useState(false);
 
@@ -282,21 +283,15 @@ export default function SoituoiResultCard({
               <div>
                 <span className="text-xs text-sky-800 font-bold block mb-1">
                   Bác sĩ đọc kết quả:
-                  {!isAdmin && (
-                    <span className="text-[10px] text-amber-600 font-normal ml-2">
-                      (Chỉ Admin đổi)
-                    </span>
-                  )}
                 </span>
                 <select
                   disabled={!isAdmin}
                   value={caseData?.bacSiDoc || 'BS CK1 PHẠM THẾ HÙNG'}
                   onChange={(e) => onChange('bacSiDoc', e.target.value)}
-                  className={`form-select text-xs py-1.5 px-3 font-bold rounded-lg border shadow-2xs ${
-                    isAdmin
+                  className={`form-select text-xs py-1.5 px-3 font-bold rounded-lg border shadow-2xs ${isAdmin
                       ? 'text-sky-700 border-sky-300 bg-white focus:outline-none focus:border-sky-500 cursor-pointer'
                       : 'text-slate-600 border-slate-200 bg-slate-100 cursor-not-allowed select-none'
-                  }`}
+                    }`}
                 >
                   {doctorList.map((doc) => (
                     <option key={doc.username || doc.fullName} value={doc.fullName}>
@@ -319,11 +314,10 @@ export default function SoituoiResultCard({
                       : new Date().toISOString().split('T')[0]
                   }
                   onChange={(e) => onChange('ngayTraKetQua', e.target.value)}
-                  className={`text-xs py-1 px-2.5 font-bold rounded-lg border shadow-2xs w-44 ${
-                    isLab
+                  className={`text-xs py-1 px-2.5 font-bold rounded-lg border shadow-2xs w-44 ${isLab
                       ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed select-none'
                       : 'border-sky-300 bg-white text-slate-800 cursor-pointer'
-                  }`}
+                    }`}
                 />
               </div>
 
@@ -354,11 +348,10 @@ export default function SoituoiResultCard({
                 <button
                   type="button"
                   onClick={onToggleSign}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${
-                    caseData?.daKy
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer ${caseData?.daKy
                       ? 'bg-amber-500 hover:bg-amber-600 text-white'
                       : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                  }`}
+                    }`}
                 >
                   {caseData?.daKy ? (
                     <>

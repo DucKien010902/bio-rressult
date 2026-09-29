@@ -77,8 +77,8 @@ function SettingsSourcesContent() {
     }
     try {
       const parsed = JSON.parse(rawUser);
-      if (parsed.role !== 'admin') {
-        toast.warning('Bạn không có quyền truy cập trang Cài đặt!', 'Từ chối');
+      if (parsed.role !== 'superadmin' && parsed.username !== 'superadmin') {
+        toast.warning('Chỉ Super Admin mới có quyền truy cập trang Cài đặt Nguồn / Đơn vị!', 'Từ chối');
         router.push('/');
         return;
       }
@@ -518,42 +518,24 @@ function SettingsSourcesContent() {
                 </div>
               </div>
 
-              {/* Mật khẩu & Đơn vị phân vùng */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Mật khẩu {isEditModalOpen && <span className="text-slate-400 font-normal">(bỏ trống nếu giữ nguyên)</span>}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      placeholder={isEditModalOpen ? '••••••••' : 'Mặc định: 123456'}
-                      value={sourceForm.password}
-                      onChange={(e) => setSourceForm({ ...sourceForm, password: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-900 focus:outline-none focus:border-[#0070f3] focus:ring-2 focus:ring-blue-500/20 pl-9"
-                    />
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  </div>
+              {/* Đơn vị phân vùng ca bệnh */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tên Đơn vị liên kết (Phân vùng ca xét nghiệm) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="VD: Bệnh Viện Phụ Sản Hà Nội"
+                    value={sourceForm.donVi}
+                    onChange={(e) => setSourceForm({ ...sourceForm, donVi: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-900 focus:outline-none focus:border-[#0070f3] focus:ring-2 focus:ring-blue-500/20 pl-9"
+                  />
+                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Tên Đơn vị liên kết (Phân vùng ca xét nghiệm) <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="VD: Bệnh Viện Phụ Sản Hà Nội"
-                      value={sourceForm.donVi}
-                      onChange={(e) => setSourceForm({ ...sourceForm, donVi: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-900 focus:outline-none focus:border-[#0070f3] focus:ring-2 focus:ring-blue-500/20 pl-9"
-                    />
-                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  </div>
-                  <span className="text-[10px] text-slate-400 block mt-1">
-                    * Tài khoản này khi đăng nhập chỉ xem được các ca xét nghiệm có trường Đơn vị khớp với giá trị này.
-                  </span>
-                </div>
+                <span className="text-[10px] text-slate-400 block mt-1">
+                  * Tên đơn vị dùng để lọc và gán ca xét nghiệm cho cơ sở này.
+                </span>
               </div>
 
               {/* SĐT & Email */}

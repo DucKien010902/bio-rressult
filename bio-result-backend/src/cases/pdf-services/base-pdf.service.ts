@@ -12,14 +12,21 @@ export class BasePdfService {
    * @param pg Trang PDF cần vẽ
    * @param centerX Trục ngang trung tâm của khối chữ ký
    * @param centerY Trục dọc trung tâm của khối chữ ký
-   * @param size Đường kính con dấu (mặc định 92pt)
+  /**
+   * Đóng con dấu đỏ công ty GenHD lên vùng chữ ký bác sĩ
+   * Chỉ thực hiện khi ca đã được Admin xác nhận trả kết quả (trangThai === 'da_tra_ket_qua')
+   * @param pdfDoc Đối tượng PDFDocument
+   * @param pg Trang PDF cần vẽ
+   * @param centerX Trục ngang trung tâm của khối chữ ký
+   * @param centerY Trục dọc trung tâm của khối chữ ký
+   * @param size Đường kính con dấu (mặc định 132pt)
    */
   async drawOfficialStamp(
     pdfDoc: any,
     pg: any,
-    centerX: number,
-    centerY: number,
-    size = 175,
+    centerX?: number,
+    centerY?: number,
+    size = 165,
   ): Promise<boolean> {
     try {
       const stampPath = path.join(process.cwd(), 'templates', 'con_dau_genhd.png');
@@ -29,17 +36,9 @@ export class BasePdfService {
       const buf = fs.readFileSync(stampPath);
       const embeddedStamp = await pdfDoc.embedPng(buf);
 
-      // Con dấu to hơn (size=175), mép phải đặt sát 592pt để dịch tối đa sang phải
-      let stampX = centerX + 10;
-      if (stampX + size > 592) {
-        stampX = 592 - size;
-      }
-
-      // Hạ trục Y xuống dưới một chút
-      let stampY = centerY - size / 2 - 12;
-      if (stampY < 8) {
-        stampY = 8;
-      }
+      // Đóng dấu treo ở góc trên bên phải trang (bên cạnh tiêu đề công ty) dịch sang phải & lên trên
+      const stampX = 430;
+      const stampY = 698;
 
       pg.drawImage(embeddedStamp, {
         x: stampX,
