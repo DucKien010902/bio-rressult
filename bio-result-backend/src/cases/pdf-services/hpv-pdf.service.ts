@@ -280,6 +280,33 @@ export class HpvPdfService extends BasePdfService {
         { bold: true, size: 9.5, color: r3Pos ? redColor : blueColor },
       );
 
+      // 3.5. NẾU CÓ BIỂU ĐỒ REAL-TIME PCR
+      // Ô trắng trong phôi: Y = [292.90, 356.65] (cao 63.75pt), X = [42.25, 552.99]
+      if (caseItem.hienBieuDo && caseItem.anhHpv) {
+        try {
+          const imgBuffer = await this.minioService.getImageBuffer(caseItem.anhHpv);
+          if (imgBuffer) {
+            // Che chữ placeholder lọt lòng bên trong khung trắng, tuyệt đối không đè vạch
+            pg.drawRectangle({
+              x: 43.5,
+              y: 294.0,
+              width: 508.0,
+              height: 61.5,
+              color: rgb(1, 1, 1),
+            });
+            // Chiều cao ảnh = 90% khoảng trắng (57.4pt), căn giữa lọt lòng, giữ 100% tỷ lệ gốc
+            await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
+              x: 45.0,
+              y: 296.1,
+              width: 505.0,
+              height: 57.4,
+            });
+          }
+        } catch (e) {
+          // ignore error
+        }
+      }
+
       // 4. KẾT LUẬN & KHUYẾN NGHỊ (Căn chuẩn 2 cột: Cột nhãn X=43.5, Cột nội dung X=125)
       const klText = (caseItem.ketLuan || 'ÂM TÍNH VỚI CÁC TYPE HPV KHẢO SÁT.').toUpperCase();
       drawText(klText, 125, 262.9, {
@@ -484,23 +511,26 @@ export class HpvPdfService extends BasePdfService {
         textColor,
       });
 
-      // 6. NẾU CÓ BIỂU ĐỒ REAL-TIME PCR
+      // 6. NẾU CÓ BIỂU ĐỒ REAL-TIME PCR (HPV 40)
+      // Ô trắng trong phôi: Y = [261.72, 325.47] (cao 63.75pt), X = [42.25, 552.99]
       if (caseItem.hienBieuDo && caseItem.anhHpv) {
         try {
           const imgBuffer = await this.minioService.getImageBuffer(caseItem.anhHpv);
           if (imgBuffer) {
+            // Che chữ placeholder lọt lòng bên trong khung trắng, tuyệt đối không đè vạch
             pg.drawRectangle({
-              x: 42,
-              y: 248,
-              width: 512,
-              height: 82,
+              x: 43.5,
+              y: 262.8,
+              width: 508.0,
+              height: 61.5,
               color: rgb(1, 1, 1),
             });
+            // Chiều cao ảnh = 90% khoảng trắng (57.4pt), căn giữa lọt lòng, giữ 100% tỷ lệ gốc
             await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
-              x: 45,
-              y: 249,
-              width: 506,
-              height: 80,
+              x: 45.0,
+              y: 264.9,
+              width: 505.0,
+              height: 57.4,
             });
           }
         } catch (e) {
@@ -678,23 +708,26 @@ export class HpvPdfService extends BasePdfService {
         textColor,
       });
 
-      // 6. NẾU CÓ BIỂU ĐỒ REAL-TIME PCR
+      // 6. NẾU CÓ BIỂU ĐỒ REAL-TIME PCR (HPV 23)
+      // Ô trắng trong phôi: Y = [281.81, 345.56] (cao 63.75pt), X = [42.25, 552.99]
       if (caseItem.hienBieuDo && caseItem.anhHpv) {
         try {
           const imgBuffer = await this.minioService.getImageBuffer(caseItem.anhHpv);
           if (imgBuffer) {
+            // Che chữ placeholder lọt lòng bên trong khung trắng, tuyệt đối không đè vạch
             pg.drawRectangle({
-              x: 45,
-              y: 268,
-              width: 506,
-              height: 72,
+              x: 43.5,
+              y: 282.9,
+              width: 508.0,
+              height: 61.5,
               color: rgb(1, 1, 1),
             });
+            // Chiều cao ảnh = 90% khoảng trắng (57.4pt), căn giữa lọt lòng, giữ 100% tỷ lệ gốc
             await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
-              x: 48,
-              y: 270,
-              width: 500,
-              height: 68,
+              x: 45.0,
+              y: 285.0,
+              width: 505.0,
+              height: 57.4,
             });
           }
         } catch (e) {
@@ -787,16 +820,18 @@ export class HpvPdfService extends BasePdfService {
         { bold: r3Pos, size: 9.5, color: r3Pos ? redColor : blueColor },
       );
 
-      // 4. BIỂU ĐỒ TÍN HIỆU TẢI LƯỢNG KẾT QUẢ (REAL-TIME PCR)
+      // 4. BIỂU ĐỒ TÍN HIỆU TẢI LƯỢNG KẾT QUẢ (REAL-TIME PCR - HPV 24)
+      // Ô trắng trong phôi: Y = [324.30, 410.30] (cao 86.00pt), X = [43.25, 552.25]
       if (caseItem.hienBieuDo && caseItem.anhHpv) {
         try {
           const imgBuffer = await this.minioService.getImageBuffer(caseItem.anhHpv);
           if (imgBuffer) {
+            // Chiều cao ảnh = 90% khoảng trắng (77.4pt), căn giữa lọt lòng, giữ 100% tỷ lệ gốc
             await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
-              x: 45,
-              y: 325,
-              width: 505,
-              height: 84,
+              x: 45.0,
+              y: 328.6,
+              width: 505.0,
+              height: 77.4,
             });
           }
         } catch (e) {

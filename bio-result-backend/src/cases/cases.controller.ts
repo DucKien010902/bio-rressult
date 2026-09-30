@@ -279,9 +279,9 @@ export class CasesController {
 
   @Post()
   async create(@Req() req: any, @Body() data: any) {
-    // If LAB role, auto attach their donVi
-    if (req.user?.role === 'lab' && req.user.donVi) {
-      data.donVi = req.user.donVi;
+    // If LAB role, use provided donVi or fallback to their default donVi
+    if (req.user?.role === 'lab') {
+      data.donVi = data.donVi?.trim() || req.user.donVi || '';
     }
     // Chỉ có Admin & Super Admin mới có quyền gán bác sĩ đọc KQ khi tạo mới
     if (req.user?.role !== 'admin' && req.user?.role !== 'superadmin') {
@@ -303,11 +303,16 @@ export class CasesController {
     // 1. Phân quyền cho tài khoản Đơn vị / Nguồn gửi mẫu (lab):
     // Chỉ được chỉnh sửa thông tin hành chính của bệnh nhân, KHÔNG được sửa kết quả xét nghiệm
     if (role === 'lab') {
-      if (
-        existing.donVi &&
-        req.user.donVi &&
-        existing.donVi.trim().toLowerCase() !== req.user.donVi.trim().toLowerCase()
-      ) {
+      const userDonVi = (req.user.donVi || '').trim().toLowerCase();
+      const existingDonVi = (existing.donVi || '').trim().toLowerCase();
+      const isOwner =
+        !userDonVi ||
+        existingDonVi.includes(userDonVi) ||
+        userDonVi.includes(existingDonVi) ||
+        existing.nguoiNhap === req.user.fullName ||
+        existing.nguoiNhap === req.user.username;
+
+      if (!isOwner && existingDonVi && userDonVi) {
         throw new ForbiddenException(
           'Bạn chỉ có quyền cập nhật thông tin ca thuộc đơn vị gửi mẫu của mình!',
         );
@@ -332,6 +337,7 @@ export class CasesController {
         'bacSiChiDinh',
         'loaiMau',
         'ngayNhanMau',
+        'donVi',
       ];
       for (const key of labFields) {
         if (data[key] !== undefined) {

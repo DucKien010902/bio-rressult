@@ -209,9 +209,9 @@ function NewCaseContent() {
           effectiveDonVi = effectiveDonVi || 'Trung tâm GenHD';
           effectiveNguoiNhap = 'Admin phòng Lab';
         }
-      } else if (currentUser?.role === 'lab' && currentUser.donVi) {
-        effectiveDonVi = currentUser.donVi;
-        effectiveNguoiNhap = currentUser.fullName || currentUser.donVi;
+      } else if (currentUser?.role === 'lab') {
+        effectiveDonVi = formData.donVi.trim() || currentUser.donVi || '';
+        effectiveNguoiNhap = currentUser.fullName || currentUser.donVi || effectiveDonVi;
       }
 
       const isCombo = selectedCategory.startsWith('combo_');
@@ -543,14 +543,10 @@ function NewCaseContent() {
                   </label>
                   <input
                     type="text"
-                    disabled={!isAdmin && currentUser?.role === 'lab'}
                     value={formData.donVi}
                     onChange={(e) => handleFieldChange('donVi', e.target.value)}
                     placeholder="Đơn vị gửi mẫu"
-                    className={`w-full px-3.5 py-2.5 rounded-xl border font-medium text-xs sm:text-sm outline-none ${!isAdmin && currentUser?.role === 'lab'
-                      ? 'bg-slate-100/90 text-slate-600 border-slate-200 cursor-not-allowed select-none'
-                      : 'border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-[#0070f3] focus:border-[#0070f3]'
-                      }`}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-900 text-xs sm:text-sm focus:ring-2 focus:ring-[#0070f3] focus:border-[#0070f3] outline-none placeholder:text-slate-400"
                   />
                 </div>
 
