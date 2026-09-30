@@ -639,7 +639,7 @@ export default function CaseTable({
 
       {/* 2. DATA TABLE CARD */}
       <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[260px] pb-4">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-xs">
@@ -674,7 +674,7 @@ export default function CaseTable({
                   </td>
                 </tr>
               ) : (
-                paginatedCases.map((item) => {
+                paginatedCases.map((item, index) => {
                   const sourceName =
                     typeof item.nguoiNhap === 'object'
                       ? item.nguoiNhap?.fullName
@@ -683,6 +683,11 @@ export default function CaseTable({
                   const createdDate = item.createdAt
                     ? new Date(item.createdAt).toLocaleDateString('vi-VN')
                     : item.ngayNhanMau || '';
+
+                  // Tự động lật hướng menu lên trên nếu là các dòng ở cuối bảng
+                  const isLastRows = paginatedCases.length > 2
+                    ? index >= paginatedCases.length - 2
+                    : index === paginatedCases.length - 1;
 
                   // Tính toán thời gian trả / dự kiến & trạng thái quá hạn
                   const turnaround = getCaseTurnaroundInfo(item, turnaroundMap);
@@ -899,7 +904,11 @@ export default function CaseTable({
 
                         {openActionId === item._id && (
                           <div
-                            className="absolute right-4 top-10 w-44 bg-white rounded-xl shadow-lg border border-slate-200 py-1.5 z-40 text-left animate-in fade-in slide-in-from-top-1"
+                            className={`absolute right-4 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 text-left transition-all ${
+                              isLastRows
+                                ? 'bottom-9 mb-1 animate-in fade-in slide-in-from-bottom-2'
+                                : 'top-10 animate-in fade-in slide-in-from-top-1'
+                            }`}
                             onMouseLeave={() => setOpenActionId(null)}
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -936,19 +945,21 @@ export default function CaseTable({
                               </span>
                             </button>
 
-                            {/* 1.5 Lịch sử thao tác */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenActionId(null);
-                                setSelectedCaseForHistory(item);
-                                setShowHistoryModal(true);
-                              }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer text-left"
-                            >
-                              <History className="w-4 h-4 text-amber-600" />
-                              <span>Lịch sử thao tác</span>
-                            </button>
+                            {/* 1.5 Lịch sử thao tác (Chỉ hiển thị cho Admin / Super Admin) */}
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionId(null);
+                                  setSelectedCaseForHistory(item);
+                                  setShowHistoryModal(true);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer text-left"
+                              >
+                                <History className="w-4 h-4 text-amber-600" />
+                                <span>Lịch sử thao tác</span>
+                              </button>
+                            )}
 
                             {/* 2. Sửa thông tin phiếu */}
                             <Link

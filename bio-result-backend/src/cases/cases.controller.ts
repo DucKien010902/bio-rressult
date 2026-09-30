@@ -505,9 +505,16 @@ export class CasesController {
     return this.casesService.releaseResult(id, req.user);
   }
 
-  // Xem lịch sử thao tác và chỉnh sửa của phiếu
+  // Xem lịch sử thao tác và chỉnh sửa của phiếu (Chỉ Admin / Super Admin mới được xem)
   @Get(':id/history')
-  async getHistory(@Param('id') id: string) {
+  async getHistory(@Req() req: any, @Param('id') id: string) {
+    const isSuper = req.user?.role === 'superadmin' || req.user?.username === 'superadmin';
+    const isAdmin = req.user?.role === 'admin' || req.user?.username === 'admin' || isSuper;
+    if (!isAdmin) {
+      throw new ForbiddenException(
+        'Chỉ tài khoản Quản trị (Admin/Super Admin) mới có quyền xem lịch sử thao tác!',
+      );
+    }
     return this.casesService.getHistory(id);
   }
 
