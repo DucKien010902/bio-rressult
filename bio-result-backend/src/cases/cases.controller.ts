@@ -25,6 +25,40 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 
+function isLabUserCase(user: any, caseItem: any): boolean {
+  if (!user || user.role !== 'lab') return true;
+
+  const uDonVi = (user.donVi || '').trim().toLowerCase();
+  const uName = (user.fullName || '').trim().toLowerCase();
+  const uUser = (user.username || '').trim().toLowerCase();
+
+  const cDonVi = (caseItem.donVi || '').trim().toLowerCase();
+  const cNguoiNhap = (caseItem.nguoiNhap || '').trim().toLowerCase();
+
+  if (cNguoiNhap) {
+    if (
+      (uName && cNguoiNhap.includes(uName)) ||
+      (uUser && cNguoiNhap.includes(uUser)) ||
+      (uDonVi && cNguoiNhap.includes(uDonVi)) ||
+      (uName && uName.includes(cNguoiNhap)) ||
+      (uUser && uUser.includes(cNguoiNhap)) ||
+      (uDonVi && uDonVi.includes(cNguoiNhap))
+    ) {
+      return true;
+    }
+  }
+
+  if (cDonVi && uDonVi) {
+    if (cDonVi.includes(uDonVi) || uDonVi.includes(cDonVi)) {
+      return true;
+    }
+  }
+
+  if (!cNguoiNhap && !cDonVi) return true;
+
+  return false;
+}
+
 @Controller('cases')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class CasesController {
@@ -185,13 +219,8 @@ export class CasesController {
     if (!caseItem) {
       throw new NotFoundException('Không tìm thấy phiếu xét nghiệm');
     }
-    // Check permission for LAB role
-    if (
-      req.user?.role === 'lab' &&
-      caseItem.donVi &&
-      req.user.donVi &&
-      caseItem.donVi !== req.user.donVi
-    ) {
+    // Check permission for LAB role (kiểm tra theo người tạo nguoiNhap trước, không bắt buộc trùng đơn vị)
+    if (!isLabUserCase(req.user, caseItem)) {
       throw new ForbiddenException(
         'Tài khoản đơn vị của bạn không có quyền truy cập ca này!',
       );
@@ -250,13 +279,8 @@ export class CasesController {
     if (!caseItem) {
       throw new NotFoundException('Không tìm thấy phiếu xét nghiệm');
     }
-    // Check permission for LAB role
-    if (
-      req.user?.role === 'lab' &&
-      caseItem.donVi &&
-      req.user.donVi &&
-      caseItem.donVi !== req.user.donVi
-    ) {
+    // Check permission for LAB role (kiểm tra theo người tạo nguoiNhap trước, không bắt buộc trùng đơn vị)
+    if (!isLabUserCase(req.user, caseItem)) {
       throw new ForbiddenException(
         'Tài khoản đơn vị của bạn không có quyền tải PDF ca này!',
       );
@@ -301,20 +325,11 @@ export class CasesController {
     }
 
     // 1. Phân quyền cho tài khoản Đơn vị / Nguồn gửi mẫu (lab):
-    // Chỉ được chỉnh sửa thông tin hành chính của bệnh nhân, KHÔNG được sửa kết quả xét nghiệm
+    // Dựa trên Nguồn tạo/nhập nguoiNhap trước, không kiểm tra cứng theo donVi
     if (role === 'lab') {
-      const userDonVi = (req.user.donVi || '').trim().toLowerCase();
-      const existingDonVi = (existing.donVi || '').trim().toLowerCase();
-      const isOwner =
-        !userDonVi ||
-        existingDonVi.includes(userDonVi) ||
-        userDonVi.includes(existingDonVi) ||
-        existing.nguoiNhap === req.user.fullName ||
-        existing.nguoiNhap === req.user.username;
-
-      if (!isOwner && existingDonVi && userDonVi) {
+      if (!isLabUserCase(req.user, existing)) {
         throw new ForbiddenException(
-          'Bạn chỉ có quyền cập nhật thông tin ca thuộc đơn vị gửi mẫu của mình!',
+          'Bạn chỉ có quyền cập nhật thông tin ca do đơn vị của mình tạo!',
         );
       }
       if (existing.trangThai === 'da_tra_ket_qua') {

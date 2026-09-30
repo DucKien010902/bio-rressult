@@ -164,9 +164,16 @@ export class CasesService {
       });
     }
 
-    // Lọc theo đơn vị gửi mẫu
+    // Lọc theo đơn vị gửi mẫu / Nguồn (hỗ trợ kiểm tra cả donVi và nguoiNhap)
     if (donVi && donVi.trim() !== '') {
-      conditions.push({ donVi: new RegExp(donVi.trim(), 'i') });
+      const cleanDonVi = donVi.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const donViRegex = new RegExp(cleanDonVi, 'i');
+      conditions.push({
+        $or: [
+          { donVi: donViRegex },
+          { nguoiNhap: donViRegex },
+        ],
+      });
     }
 
     // Tìm kiếm từ khóa (Mã số, tên bệnh nhân, điện thoại, tên nguồn/đơn vị, tên bác sĩ...)
@@ -941,10 +948,15 @@ export class CasesService {
       });
     }
 
-    // Lọc theo đơn vị gửi mẫu (nếu đang ở chế độ xem Bệnh viện/Lab)
+    // Lọc theo đơn vị gửi mẫu (nếu đang ở chế độ xem Bệnh viện/Lab - hỗ trợ kiểm tra cả donVi và nguoiNhap)
     if (donVi && donVi.trim() !== '') {
+      const cleanDonVi = donVi.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const donViRegex = new RegExp(cleanDonVi, 'i');
       andClauses.push({
-        donVi: new RegExp(donVi.trim(), 'i'),
+        $or: [
+          { donVi: donViRegex },
+          { nguoiNhap: donViRegex },
+        ],
       });
     }
 
@@ -1168,9 +1180,16 @@ export class CasesService {
       });
     }
 
-    // Lọc theo đơn vị
+    // Lọc theo Nguồn nhập / Đơn vị (ưu tiên nguoiNhap trước)
     if (donVi && donVi.trim() !== '') {
-      conditions.push({ donVi: new RegExp(donVi.trim(), 'i') });
+      const cleanDonVi = donVi.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const donViRegex = new RegExp(cleanDonVi, 'i');
+      conditions.push({
+        $or: [
+          { nguoiNhap: donViRegex },
+          { donVi: donViRegex },
+        ],
+      });
     }
 
     const query = conditions.length > 0 ? { $and: conditions } : {};

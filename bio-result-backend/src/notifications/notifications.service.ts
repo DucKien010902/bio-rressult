@@ -4,6 +4,13 @@ import { Model } from 'mongoose';
 import { Notification, NotificationDocument } from './schemas/notification.schema.js';
 import { BioCase } from '../cases/schemas/case.schema.js';
 
+function toSafeString(val: any): string {
+  if (!val) return '';
+  if (Array.isArray(val)) return String(val[0] || '').trim();
+  if (typeof val === 'string') return val.trim();
+  return String(val).trim();
+}
+
 @Injectable()
 export class NotificationsService {
   constructor(
@@ -42,7 +49,10 @@ export class NotificationsService {
     source?: string;
     username?: string;
   } = {}) {
-    const { doctor, role, source, username } = params;
+    const doctor = toSafeString(params.doctor);
+    const role = toSafeString(params.role);
+    const source = toSafeString(params.source);
+    const username = toSafeString(params.username);
 
     // Nếu không có role hoặc thông tin người dùng được cung cấp, không trả về thông báo để tránh lộ thông báo của role khác
     if (!role && !username && !doctor && !source) {
@@ -64,31 +74,31 @@ export class NotificationsService {
       ];
     } else if (role === 'doctor' || role === 'bacsy') {
       const orList: any[] = [{ recipientRole: 'all' }];
-      if (doctor && doctor.trim()) {
+      if (doctor) {
         orList.push({
           recipientRole: 'doctor',
-          doctorName: new RegExp(doctor.trim(), 'i'),
+          doctorName: new RegExp(doctor, 'i'),
         });
       }
-      if (username && username.trim()) {
+      if (username) {
         orList.push({
           recipientRole: 'doctor',
-          recipientUsername: username.trim(),
+          recipientUsername: username,
         });
       }
       query.$or = orList;
     } else if (role === 'lab' || role === 'source') {
       const orList: any[] = [{ recipientRole: 'all' }];
-      if (source && source.trim()) {
+      if (source) {
         orList.push({
           recipientRole: 'source',
-          sourceName: new RegExp(source.trim(), 'i'),
+          sourceName: new RegExp(source, 'i'),
         });
       }
-      if (username && username.trim()) {
+      if (username) {
         orList.push({
           recipientRole: 'source',
-          recipientUsername: username.trim(),
+          recipientUsername: username,
         });
       }
       query.$or = orList;
@@ -120,23 +130,28 @@ export class NotificationsService {
         $set: { isRead: true },
       });
     } else {
+      const doctor = toSafeString(params?.doctor);
+      const role = toSafeString(params?.role);
+      const source = toSafeString(params?.source);
+      const username = toSafeString(params?.username);
+
       // Build filter if user marks all read for their own role
       const query: any = {};
-      if (params?.role === 'admin' || params?.role === 'superadmin') {
+      if (role === 'admin' || role === 'superadmin') {
         query.$or = [
           { recipientRole: 'admin' },
           { recipientRole: 'all' },
           { recipientRole: { $exists: false } },
           { recipientRole: '' },
         ];
-      } else if (params?.role === 'doctor' && params?.doctor) {
+      } else if (role === 'doctor' && doctor) {
         query.$or = [
-          { recipientRole: 'doctor', doctorName: new RegExp(params.doctor.trim(), 'i') },
+          { recipientRole: 'doctor', doctorName: new RegExp(doctor, 'i') },
           { recipientRole: 'all' },
         ];
-      } else if ((params?.role === 'lab' || params?.role === 'source') && params?.source) {
+      } else if ((role === 'lab' || role === 'source') && source) {
         query.$or = [
-          { recipientRole: 'source', sourceName: new RegExp(params.source.trim(), 'i') },
+          { recipientRole: 'source', sourceName: new RegExp(source, 'i') },
           { recipientRole: 'all' },
         ];
       }
@@ -156,41 +171,46 @@ export class NotificationsService {
     source?: string;
     username?: string;
   }) {
+    const doctor = toSafeString(params?.doctor);
+    const role = toSafeString(params?.role);
+    const source = toSafeString(params?.source);
+    const username = toSafeString(params?.username);
+
     const query: any = {};
     if (
-      params?.role === 'admin' ||
-      params?.role === 'superadmin' ||
-      params?.username === 'admin' ||
-      params?.username === 'superadmin'
+      role === 'admin' ||
+      role === 'superadmin' ||
+      username === 'admin' ||
+      username === 'superadmin'
     ) {
       // Admin xóa toàn bộ thông báo của hệ thống
-    } else if (params?.role === 'doctor' || params?.role === 'bacsy') {
+    } else if (role === 'doctor' || role === 'bacsy') {
       const orList: any[] = [];
-      if (params.doctor && params.doctor.trim()) {
+      if (doctor) {
         orList.push({
           recipientRole: 'doctor',
-          doctorName: new RegExp(params.doctor.trim(), 'i'),
+          doctorName: new RegExp(doctor, 'i'),
         });
       }
-      if (params.username && params.username.trim()) {
+      if (username) {
         orList.push({
           recipientRole: 'doctor',
-          recipientUsername: params.username.trim(),
+          recipientUsername: username,
         });
       }
       if (orList.length > 0) query.$or = orList;
-    } else if (params?.role === 'lab' || params?.role === 'source') {
+    } else if (role === 'lab' || role === 'source') {
       const orList: any[] = [];
-      if (params.source && params.source.trim()) {
+      if (source) {
         orList.push({
           recipientRole: 'source',
-          sourceName: new RegExp(params.source.trim(), 'i'),
+          sourceName: new RegExp(source, 'i'),
         });
       }
-      if (params.username && params.username.trim()) {
+      if (username) {
         orList.push({
           recipientRole: 'source',
-          recipientUsername: params.username.trim(),
+          recipientUsername: username,
         });
       }
       if (orList.length > 0) query.$or = orList;
