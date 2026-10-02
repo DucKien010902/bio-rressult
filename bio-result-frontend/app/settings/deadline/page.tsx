@@ -24,6 +24,8 @@ const SERVICES_LIST = [
   { id: 'hpv24', label: 'Xét nghiệm HPV 24 Types', group: 'Sinh học phân tử', defaultHours: 48 },
   { id: 'soituoi', label: 'Xét nghiệm Soi tươi', group: 'Vi sinh', defaultHours: 4 },
   { id: 'giaiphaubenh', label: 'Giải Phẫu Bệnh', group: 'Mô bệnh học', defaultHours: 72 },
+  { id: 'giaiphaubenh_mobenh', label: 'Giải Phẫu Bệnh - Mô Bệnh', group: 'Mô bệnh học', defaultHours: 72 },
+  { id: 'giaiphaubenh_tebaohoc', label: 'Giải Phẫu Bệnh - Tế Bào Học', group: 'Mô bệnh học', defaultHours: 72 },
   { id: 'combo_hpv20_cell', label: 'Gói Combo: HPV 20 + Cell', group: 'Combo 2 trong 1', defaultHours: 48 },
   { id: 'combo_hpv40_cell', label: 'Gói Combo: HPV 40 + Cell', group: 'Combo 2 trong 1', defaultHours: 48 },
   { id: 'combo_hpv23_cell', label: 'Gói Combo: HPV 23 + Cell', group: 'Combo 2 trong 1', defaultHours: 48 },
@@ -172,7 +174,7 @@ function SettingsDeadlineContent() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs">
             <div>
               <Link
-                href="/"
+                href="/?category=all"
                 className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#0070f3] transition-colors mb-1.5"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />

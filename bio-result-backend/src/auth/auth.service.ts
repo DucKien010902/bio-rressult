@@ -60,4 +60,22 @@ export class AuthService {
       throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
     }
   }
+
+  async getProfile(token: string) {
+    const payload = await this.verifyToken(token);
+    const user = await this.usersService.findById(payload.sub);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Tài khoản không tồn tại hoặc đã bị khóa');
+    }
+    return {
+      id: user._id,
+      username: user.username,
+      fullName: user.fullName,
+      role: user.role,
+      donVi: user.donVi || '',
+      allowedCategories: user.allowedCategories || [],
+      doctorId: user.doctorId,
+      sourceId: user.sourceId,
+    };
+  }
 }

@@ -82,8 +82,8 @@ export class ComboPdfService extends BasePdfService {
     if (!fs.existsSync(fontBoldPath))
       fontBoldPath = 'C:/Windows/Fonts/arialbd.ttf';
 
-    const fontR = await pdfDoc.embedFont(fs.readFileSync(fontPath));
-    const fontB = await pdfDoc.embedFont(fs.readFileSync(fontBoldPath));
+    const fontR = await pdfDoc.embedFont(fs.readFileSync(fontPath), { subset: true });
+    const fontB = await pdfDoc.embedFont(fs.readFileSync(fontBoldPath), { subset: true });
 
     // Chuyển Mongoose Document sang plain object để không bị mất dữ liệu schema khi spread
     const rawCase =
@@ -126,7 +126,7 @@ export class ComboPdfService extends BasePdfService {
       1,
     );
 
-    const output = await pdfDoc.save();
+    const output = await pdfDoc.save({ useObjectStreams: true });
     return Buffer.from(output);
   }
 

@@ -161,7 +161,13 @@ export default function GiaiphaubenhResultCard({
       <div className="p-6 pb-4 flex items-center justify-between border-b border-slate-100">
         <div className="flex items-center gap-2.5 text-amber-700 font-black text-sm uppercase tracking-tight">
           <FileText className="w-5 h-5 text-amber-600" />
-          <span>KẾT QUẢ XÉT NGHIỆM GIẢI PHẪU BỆNH</span>
+          <span>
+            {caseData?.loaiXetNghiem === 'giaiphaubenh_mobenh'
+              ? 'KẾT QUẢ XÉT NGHIỆM GIẢI PHẪU BỆNH – MÔ BỆNH'
+              : caseData?.loaiXetNghiem === 'giaiphaubenh_tebaohoc'
+              ? 'KẾT QUẢ XÉT NGHIỆM GIẢI PHẪU BỆNH – TẾ BÀO HỌC'
+              : 'KẾT QUẢ XÉT NGHIỆM GIẢI PHẪU BỆNH'}
+          </span>
         </div>
 
         <div className="flex items-center gap-3">

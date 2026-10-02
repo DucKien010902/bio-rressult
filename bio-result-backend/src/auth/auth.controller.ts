@@ -36,6 +36,6 @@ export class AuthController {
       throw new UnauthorizedException('Chưa cung cấp token');
     }
     const token = authHeader.split(' ')[1];
-    return this.authService.verifyToken(token);
+    return this.authService.getProfile(token);
   }
 }

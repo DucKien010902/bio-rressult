@@ -46,6 +46,8 @@ const DOCTOR_CATEGORIES = [
   { id: 'hpv24', label: 'Sinh học phân tử (HPV 24)', badge: 'bg-teal-50 text-teal-800 border-teal-300' },
   { id: 'soituoi', label: 'Vi sinh (Soi tươi)', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
   { id: 'giaiphaubenh', label: 'Mô bệnh học (Giải phẫu bệnh)', badge: 'bg-purple-50 text-purple-700 border-purple-200' },
+  { id: 'giaiphaubenh_mobenh', label: 'Giải phẫu bệnh - Mô bệnh', badge: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' },
+  { id: 'giaiphaubenh_tebaohoc', label: 'Giải phẫu bệnh - Tế bào học', badge: 'bg-rose-50 text-rose-700 border-rose-200' },
 ];
 
 const TITLE_SUGGESTIONS = [
@@ -83,7 +85,7 @@ function SettingsDoctorsContent() {
     soDienThoai: '',
     email: '',
     chungChiHanhNghe: '',
-    allowedCategories: ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh'],
+    allowedCategories: ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh', 'giaiphaubenh_mobenh', 'giaiphaubenh_tebaohoc'],
     isActive: true,
     signatureUrl: '',
   });
@@ -145,7 +147,7 @@ function SettingsDoctorsContent() {
       chungChiHanhNghe: doc.chungChiHanhNghe || '',
       allowedCategories: Array.isArray(doc.allowedCategories) && doc.allowedCategories.length > 0
         ? doc.allowedCategories
-        : ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh'],
+        : ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh', 'giaiphaubenh_mobenh', 'giaiphaubenh_tebaohoc'],
       isActive: doc.isActive !== false,
       signatureUrl: doc.signatureUrl || '',
     });
@@ -164,7 +166,7 @@ function SettingsDoctorsContent() {
       soDienThoai: '',
       email: '',
       chungChiHanhNghe: '',
-      allowedCategories: ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh'],
+      allowedCategories: ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh', 'giaiphaubenh_mobenh', 'giaiphaubenh_tebaohoc'],
       isActive: true,
       signatureUrl: '',
     });
@@ -325,7 +327,7 @@ function SettingsDoctorsContent() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs">
             <div>
               <Link
-                href="/"
+                href="/?category=all"
                 className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#0070f3] transition-colors mb-1.5"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />

@@ -139,23 +139,23 @@ export class CellPdfService extends BasePdfService {
     const X_LEFT = 137.5;
     const X_RIGHT = 399.5;
 
-    drawCellText(X_LEFT, 712.8, caseItem.maSo || '', { bold: true, size: 9.5 });
+    drawCellText(X_LEFT, 710.8, caseItem.maSo || '', { bold: true, size: 9.5 });
     drawCellText(
       X_RIGHT,
-      712.8,
+      710.8,
       (caseItem.hoTen || '').toUpperCase(),
       { bold: true, size: 9.5 },
     );
 
-    drawCellText(X_LEFT, 694.0, String(caseItem.namSinh || ''), { size: 9.0 });
-    drawCellText(X_RIGHT, 694.0, caseItem.gioiTinh || 'Nữ', { size: 9.0 });
+    drawCellText(X_LEFT, 691.9, String(caseItem.namSinh || ''), { size: 9.0 });
+    drawCellText(X_RIGHT, 691.9, caseItem.gioiTinh || 'Nữ', { size: 9.0 });
 
-    drawCellText(X_LEFT, 675.1, caseItem.diaChi || '', { size: 8.5 });
+    drawCellText(X_LEFT, 672.9, caseItem.diaChi || '', { size: 8.5 });
 
-    drawCellText(X_LEFT, 656.4, caseItem.soDienThoai || '', { size: 9.0 });
-    drawCellText(X_RIGHT, 656.4, caseItem.bacSiChiDinh || '', { size: 9.0 });
+    drawCellText(X_LEFT, 654.2, caseItem.soDienThoai || '', { size: 9.0 });
+    drawCellText(X_RIGHT, 654.2, caseItem.bacSiChiDinh || '', { size: 9.0 });
 
-    drawCellText(X_LEFT, 635.5, caseItem.donVi || '', { size: 9.0 });
+    drawCellText(X_LEFT, 635.2, caseItem.donVi || '', { size: 9.0 });
 
     // Loại mẫu: Che chữ "Dịch phết" in sẵn và vẽ loại mẫu
     pg.drawRectangle({
@@ -783,11 +783,11 @@ export class CellPdfService extends BasePdfService {
     const fontItalicPath = path.join(process.cwd(), 'templates', 'fonts', 'ariali.ttf');
     if (fs.existsSync(fontTimesBiPath)) {
       try {
-        fontDate = await pdfDoc.embedFont(fs.readFileSync(fontTimesBiPath));
+        fontDate = await pdfDoc.embedFont(fs.readFileSync(fontTimesBiPath), { subset: true });
       } catch (e) {}
     } else if (fs.existsSync(fontItalicPath)) {
       try {
-        fontDate = await pdfDoc.embedFont(fs.readFileSync(fontItalicPath));
+        fontDate = await pdfDoc.embedFont(fs.readFileSync(fontItalicPath), { subset: true });
       } catch (e) {}
     }
 

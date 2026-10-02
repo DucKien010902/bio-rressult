@@ -2,7 +2,7 @@
 
 import React, { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Sidebar, { MENU_CATEGORIES } from '@/components/layout/Sidebar';
+import Sidebar, { MENU_CATEGORIES, isCategoryPermitted } from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import CaseTable, { CaseItem } from '@/components/cases/CaseTable';
 import DashboardView from '@/components/dashboard/DashboardView';
@@ -39,25 +39,55 @@ function DashboardContent() {
     }
   }, [categoryParam]);
 
-  // Check auth & clean old cached GenHD usernames
+  // Check auth & clean old cached GenHD usernames, đồng bộ quyền hạn mới nhất từ máy chủ
   useEffect(() => {
     const userStr = localStorage.getItem('bio_user');
     if (!userStr) {
       router.push('/login');
-    } else {
-      try {
-        const u = JSON.parse(userStr);
-        if (u.fullName && (u.fullName.includes('GenHD') || u.fullName.includes('genhd') || u.fullName.includes('Quản Trị Viên Lab'))) {
-          u.fullName = 'Admin phòng Lab';
-          u.donVi = 'Quản lý Lab';
-          localStorage.setItem('bio_user', JSON.stringify(u));
-        }
-        setCurrentUser(u);
-      } catch {
-        router.push('/login');
+      return;
+    }
+    try {
+      const u = JSON.parse(userStr);
+      if (u.fullName && (u.fullName.includes('GenHD') || u.fullName.includes('genhd') || u.fullName.includes('Quản Trị Viên Lab'))) {
+        u.fullName = 'Admin phòng Lab';
+        u.donVi = 'Quản lý Lab';
+        localStorage.setItem('bio_user', JSON.stringify(u));
       }
+      setCurrentUser(u);
+    } catch {
+      router.push('/login');
+      return;
+    }
+
+    // Tự động đồng bộ quyền hạn mới nhất từ backend
+    const token = localStorage.getItem('bio_token');
+    if (token) {
+      fetch(getApiUrl('/auth/me'), {
+        headers: getAuthHeaders(),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((freshUser) => {
+          if (freshUser && freshUser.username) {
+            setCurrentUser((prev: any) => {
+              const merged = { ...(prev || {}), ...freshUser };
+              localStorage.setItem('bio_user', JSON.stringify(merged));
+              return merged;
+            });
+          }
+        })
+        .catch(() => {});
     }
   }, [router]);
+
+  // Đảm bảo activeCategory hợp lệ theo quyền của tài khoản nguồn / bác sĩ
+  useEffect(() => {
+    if (!currentUser) return;
+    const role = currentUser.role;
+    if (role === 'admin' || role === 'superadmin' || currentUser.username === 'admin') return;
+    if (activeCategory && !isCategoryPermitted(activeCategory, currentUser)) {
+      setActiveCategory('all');
+    }
+  }, [currentUser, activeCategory]);
 
   // Fetch cases from Backend
   const fetchCases = async (signal?: AbortSignal) => {

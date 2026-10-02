@@ -1,9 +1,9 @@
 'use client';
 
-import React, { Suspense, useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Sidebar from '@/components/layout/Sidebar';
+import Sidebar, { COMBO_REQUIRED_MAP } from '@/components/layout/Sidebar';
 import Header from '@/components/layout/Header';
 import LogoutConfirmModal from '@/components/layout/LogoutConfirmModal';
 import { getApiUrl, getAuthHeaders } from '@/lib/config';
@@ -36,6 +36,8 @@ const SINGLE_SERVICES = [
   { id: 'hpv24', label: 'HPV 24' },
   { id: 'soituoi', label: 'Soi tươi' },
   { id: 'giaiphaubenh', label: 'Giải Phẫu Bệnh' },
+  { id: 'giaiphaubenh_mobenh', label: 'Giải Phẫu Bệnh - Mô Bệnh' },
+  { id: 'giaiphaubenh_tebaohoc', label: 'Giải Phẫu Bệnh - Tế Bào Học' },
 ];
 
 // Danh sách các gói Combo 2 trong 1 (HPV 24 là dịch vụ đơn lẻ, không có combo)
@@ -63,6 +65,35 @@ function NewCaseContent() {
   // Selected Service
   const initialCategory = searchParams?.get('category') || 'cell';
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
+
+  // Lọc danh sách dịch vụ đơn lẻ và combo theo quyền hạn của tài khoản nguồn (lab)
+  const visibleSingleServices = useMemo(() => {
+    if (isAdmin) return SINGLE_SERVICES;
+    const allowed: string[] = currentUser?.allowedCategories || [];
+    return SINGLE_SERVICES.filter((s) => allowed.includes(s.id));
+  }, [isAdmin, currentUser]);
+
+  const visibleComboServices = useMemo(() => {
+    if (isAdmin) return COMBO_SERVICES;
+    const allowed: string[] = currentUser?.allowedCategories || [];
+    return COMBO_SERVICES.filter((c) => {
+      const parts = COMBO_REQUIRED_MAP[c.id];
+      if (!parts) return false;
+      return allowed.includes(parts[0]) && allowed.includes(parts[1]);
+    });
+  }, [isAdmin, currentUser]);
+
+  // Đảm bảo loại dịch vụ đang chọn luôn hợp lệ theo quyền hạn của tài khoản
+  useEffect(() => {
+    if (!currentUser || isAdmin) return;
+    const allAllowedIds = [
+      ...visibleSingleServices.map((s) => s.id),
+      ...visibleComboServices.map((c) => c.id),
+    ];
+    if (allAllowedIds.length > 0 && !allAllowedIds.includes(selectedCategory)) {
+      setSelectedCategory(allAllowedIds[0]);
+    }
+  }, [currentUser, isAdmin, visibleSingleServices, visibleComboServices, selectedCategory]);
 
   // Form Fields
   const todayStr = new Date().toISOString().split('T')[0];
@@ -168,6 +199,8 @@ function NewCaseContent() {
       hpv24: `GTHD-HPV24-${randomNum}`,
       soituoi: `GTHD-ST-${randomNum}`,
       giaiphaubenh: `GTHD-GPB-${randomNum}`,
+      giaiphaubenh_mobenh: `GTHD-MB-${randomNum}`,
+      giaiphaubenh_tebaohoc: `GTHD-TB-${randomNum}`,
       combo_hpv20_cell: `GTHD-CB20CL-${randomNum}`,
       combo_hpv40_cell: `GTHD-CB40CL-${randomNum}`,
       combo_hpv23_cell: `GTHD-CB23CL-${randomNum}`,
@@ -306,7 +339,7 @@ function NewCaseContent() {
 
             <button
               type="button"
-              onClick={() => router.push('/')}
+              onClick={() => router.push('/?category=all')}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer self-start sm:self-auto"
             >
               <ArrowLeft className="w-4 h-4 text-slate-500" />
@@ -332,70 +365,81 @@ function NewCaseContent() {
                 </span>
               </div>
 
+              {/* Cảnh báo nếu tài khoản chưa được cấp quyền xét nghiệm nào */}
+              {!isAdmin && visibleSingleServices.length === 0 && visibleComboServices.length === 0 && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-semibold">
+                  Tài khoản đơn vị của bạn hiện chưa được cấp quyền dịch vụ xét nghiệm nào. Vui lòng liên hệ quản trị viên để kích hoạt dịch vụ liên kết!
+                </div>
+              )}
+
               {/* 1. Dịch vụ đơn lẻ */}
-              <div className="space-y-2.5">
-                <label className="block text-xs font-bold text-slate-600">
-                  1. Dịch vụ đơn lẻ (Có thể tích chọn nhiều loại cùng lúc):
-                </label>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  {SINGLE_SERVICES.map((srv) => {
-                    const isSelected = selectedCategory === srv.id;
-                    return (
-                      <button
-                        type="button"
-                        key={srv.id}
-                        onClick={() => setSelectedCategory(srv.id)}
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${isSelected
-                          ? 'bg-[#0070f3] text-white shadow-sm ring-2 ring-[#0070f3]/30'
-                          : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs'
-                          }`}
-                      >
-                        <span
-                          className={`w-4 h-4 rounded-full flex items-center justify-center border ${isSelected
-                            ? 'bg-white text-[#0070f3] border-white'
-                            : 'border-slate-300 bg-white'
+              {visibleSingleServices.length > 0 && (
+                <div className="space-y-2.5">
+                  <label className="block text-xs font-bold text-slate-600">
+                    1. Dịch vụ đơn lẻ:
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {visibleSingleServices.map((srv) => {
+                      const isSelected = selectedCategory === srv.id;
+                      return (
+                        <button
+                          type="button"
+                          key={srv.id}
+                          onClick={() => setSelectedCategory(srv.id)}
+                          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${isSelected
+                            ? 'bg-[#0070f3] text-white shadow-sm ring-2 ring-[#0070f3]/30'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs'
                             }`}
                         >
-                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                        </span>
-                        <span>{srv.label}</span>
-                      </button>
-                    );
-                  })}
+                          <span
+                            className={`w-4 h-4 rounded-full flex items-center justify-center border ${isSelected
+                              ? 'bg-white text-[#0070f3] border-white'
+                              : 'border-slate-300 bg-white'
+                              }`}
+                          >
+                            {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                          </span>
+                          <span>{srv.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 2. Gói Combo (2 xét nghiệm trong 1 phiếu) */}
-              <div className="space-y-2.5 pt-2">
-                <label className="block text-xs font-bold text-slate-600">
-                  2. Hoặc chọn Gói Combo (2 xét nghiệm trong 1 phiếu):
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                  {COMBO_SERVICES.map((cmb) => {
-                    const isSelected = selectedCategory === cmb.id;
-                    return (
-                      <button
-                        type="button"
-                        key={cmb.id}
-                        onClick={() => setSelectedCategory(cmb.id)}
-                        className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-left ${isSelected
-                          ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-500 text-orange-900 shadow-sm'
-                          : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs'
-                          }`}
-                      >
-                        <Flame
-                          className={`w-4 h-4 shrink-0 ${isSelected ? 'text-orange-500 fill-orange-500' : 'text-orange-400'
+              {visibleComboServices.length > 0 && (
+                <div className="space-y-2.5 pt-2">
+                  <label className="block text-xs font-bold text-slate-600">
+                    2. Hoặc chọn Gói Combo (2 xét nghiệm trong 1 phiếu):
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {visibleComboServices.map((cmb) => {
+                      const isSelected = selectedCategory === cmb.id;
+                      return (
+                        <button
+                          type="button"
+                          key={cmb.id}
+                          onClick={() => setSelectedCategory(cmb.id)}
+                          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-left ${isSelected
+                            ? 'bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-500 text-orange-900 shadow-sm'
+                            : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-2xs'
                             }`}
-                        />
-                        <span className="truncate">{cmb.label}</span>
-                        {isSelected && (
-                          <CheckCircle2 className="w-4 h-4 text-orange-600 ml-auto shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
+                        >
+                          <Flame
+                            className={`w-4 h-4 shrink-0 ${isSelected ? 'text-orange-500 fill-orange-500' : 'text-orange-400'
+                              }`}
+                          />
+                          <span className="truncate">{cmb.label}</span>
+                          {isSelected && (
+                            <CheckCircle2 className="w-4 h-4 text-orange-600 ml-auto shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* KHỐI 2: THÔNG TIN HÀNH CHÍNH BỆNH NHÂN */}

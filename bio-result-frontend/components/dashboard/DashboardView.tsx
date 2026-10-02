@@ -7,7 +7,6 @@ import {
   Clock,
   CheckCircle2,
   Layers,
-  FileSpreadsheet,
   Activity,
   FlaskConical,
   Sparkles,
@@ -104,13 +103,21 @@ export default function DashboardView({
     fetchStats();
   }, [currentUser]);
 
-  const handleExportExcel = (type: 'all' | 'doctor') => {
-    let url = getApiUrl(`/cases/stats/export-excel?type=${type}`);
-    if (isDoctor && doctorName) {
-      url += `&doctor=${encodeURIComponent(doctorName)}`;
-    }
-    window.open(url, '_blank');
-  };
+  // --- Tất cả hooks phải được gọi ở đây, trước mọi early return ---
+  const rawByCategory = stats?.byCategory || [];
+  const isSpecialRole =
+    currentUser?.role === 'doctor' ||
+    currentUser?.role === 'bacsy' ||
+    currentUser?.role === 'lab';
+  const byCategory = React.useMemo(() => {
+    if (!isSpecialRole) return rawByCategory;
+    const allowed = Array.isArray(currentUser?.allowedCategories)
+      ? currentUser.allowedCategories
+      : [];
+    if (allowed.length === 0) return rawByCategory;
+    return rawByCategory.filter((cat) => allowed.includes(cat.key));
+  }, [rawByCategory, isSpecialRole, currentUser]);
+  // --- Kết thúc vùng hooks ---
 
   const getServiceIcon = (key: string, className = 'w-4 h-4') => {
     switch (key) {
@@ -128,6 +135,8 @@ export default function DashboardView({
       case 'soituoi':
         return <Microscope className={className} />;
       case 'giaiphaubenh':
+      case 'giaiphaubenh_mobenh':
+      case 'giaiphaubenh_tebaohoc':
         return <FileText className={className} />;
       default:
         return <Layers className={className} />;
@@ -150,15 +159,37 @@ export default function DashboardView({
     daTraKetQua: 0,
   };
 
-  const byCategory = stats?.byCategory || [];
   const byDoctor = stats?.byDoctor || [];
 
-  // Max value for Service Bar Chart
-  const maxCategoryCount = Math.max(...byCategory.map((c) => c.count), 200);
+  // Helper: Calculate smart Y-axis max scale dynamically based on current data magnitude
+  const getSmartMaxScale = (rawMax: number, defaultMin = 10): number => {
+    if (!rawMax || rawMax <= 0) return defaultMin;
+    if (rawMax <= 4) return 4;
+    if (rawMax <= 8) return 8;
+    if (rawMax <= 10) return 10;
 
-  // Doctors for Doctor Bar Chart (top 5)
+    const magnitude = Math.pow(10, Math.floor(Math.log10(rawMax)));
+    const normalized = rawMax / magnitude;
+
+    let multiplier = 10;
+    if (normalized <= 1) multiplier = 1;
+    else if (normalized <= 1.25) multiplier = 1.5;
+    else if (normalized <= 2) multiplier = 2;
+    else if (normalized <= 2.5) multiplier = 2.5;
+    else if (normalized <= 4) multiplier = 4;
+    else if (normalized <= 5) multiplier = 5;
+
+    return Math.max(Math.ceil(multiplier * magnitude), defaultMin);
+  };
+
+  // Dynamic Max scale for Service Bar Chart
+  const maxRawCategory = Math.max(...byCategory.map((c) => c.count), 0);
+  const maxCategoryCount = getSmartMaxScale(maxRawCategory, 10);
+
+  // Dynamic Max scale for Doctor Bar Chart (top 5)
   const topDoctors = byDoctor.slice(0, 5);
-  const maxDoctorTotal = Math.max(...topDoctors.map((d) => d.total), 500);
+  const maxDoctorRaw = Math.max(...topDoctors.map((d) => d.total), 0);
+  const maxDoctorTotal = getSmartMaxScale(maxDoctorRaw, 10);
 
   // SVG Donut Slices Calculation
   let cumulativePercent = 0;
@@ -174,7 +205,7 @@ export default function DashboardView({
 
   return (
     <div className="space-y-6 pb-12">
-      {/* 1. TOP HEADER & EXPORT ACTION */}
+      {/* 1. TOP HEADER */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
@@ -185,16 +216,6 @@ export default function DashboardView({
               ? `Tổng quan cá nhân chỉ số phiếu xét nghiệm được phân công cho ${doctorName}`
               : 'Tổng quan chỉ số hoạt động xét nghiệm tế bào & HPV GENHD'}
           </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => handleExportExcel('all')}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#00875a] hover:bg-[#00704a] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>Xuất Excel Tất Cả Dịch Vụ</span>
-          </button>
         </div>
       </div>
 
@@ -420,21 +441,21 @@ export default function DashboardView({
           <div className="flex-1 flex flex-col justify-end pt-6">
             <div className="relative h-56 flex items-end justify-between px-2 pb-6 border-b border-slate-200">
               {/* Y-axis grid marks */}
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none text-[10px] text-slate-400">
-                <div className="border-b border-dashed border-slate-200 flex justify-between">
-                  <span>{maxCategoryCount}</span>
+              <div className="absolute inset-x-0 bottom-6 h-[180px] flex flex-col justify-between pointer-events-none text-[10px] text-slate-400">
+                <div className="border-b border-dashed border-slate-200 flex justify-between items-center relative -top-2">
+                  <span className="bg-white/90 px-1 rounded text-slate-600 font-bold">{maxCategoryCount}</span>
                 </div>
-                <div className="border-b border-dashed border-slate-200 flex justify-between">
-                  <span>{Math.round(maxCategoryCount * 0.75)}</span>
+                <div className="border-b border-dashed border-slate-200 flex justify-between items-center relative -top-2">
+                  <span className="bg-white/90 px-1 rounded text-slate-400">{Math.round(maxCategoryCount * 0.75)}</span>
                 </div>
-                <div className="border-b border-dashed border-slate-200 flex justify-between">
-                  <span>{Math.round(maxCategoryCount * 0.5)}</span>
+                <div className="border-b border-dashed border-slate-200 flex justify-between items-center relative -top-2">
+                  <span className="bg-white/90 px-1 rounded text-slate-400">{Math.round(maxCategoryCount * 0.5)}</span>
                 </div>
-                <div className="border-b border-dashed border-slate-200 flex justify-between">
-                  <span>{Math.round(maxCategoryCount * 0.25)}</span>
+                <div className="border-b border-dashed border-slate-200 flex justify-between items-center relative -top-2">
+                  <span className="bg-white/90 px-1 rounded text-slate-400">{Math.round(maxCategoryCount * 0.25)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>0</span>
+                <div className="flex justify-between items-center relative -top-2">
+                  <span className="bg-white/90 px-1 rounded text-slate-400">0</span>
                 </div>
               </div>
 
@@ -442,7 +463,7 @@ export default function DashboardView({
               <div className="w-full flex items-end justify-around z-10">
                 {byCategory.map((cat) => {
                   const barHeight = Math.max(
-                    (cat.count / (maxCategoryCount || 1)) * 160,
+                    (cat.count / maxCategoryCount) * 180,
                     cat.count > 0 ? 8 : 2
                   );
                   return (
@@ -496,65 +517,63 @@ export default function DashboardView({
                 </p>
               </div>
             </div>
-
-            <button
-              onClick={() => handleExportExcel('doctor')}
-              className="flex items-center gap-2 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all cursor-pointer w-fit"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              <span>Xuất Excel Thống Kê Bác Sĩ</span>
-            </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             {/* Left: Grouped Bar Chart (5 cols) */}
             <div className="lg:col-span-5 flex flex-col justify-between h-full">
-              <div className="relative h-60 flex items-end justify-around pb-6 border-b border-slate-200">
+              <div className="relative h-60 flex items-end justify-around px-2 pb-6 border-b border-slate-200">
                 {/* Y-axis background marks */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none text-[10px] text-slate-400">
-                  <div className="border-b border-dashed border-slate-100">
-                    {maxDoctorTotal}
+                <div className="absolute inset-x-0 bottom-6 h-[190px] flex flex-col justify-between pointer-events-none text-[10px] text-slate-400">
+                  <div className="border-b border-dashed border-slate-200 flex justify-between items-center relative -top-2">
+                    <span className="bg-white/90 px-1 rounded text-slate-600 font-bold">{maxDoctorTotal}</span>
                   </div>
-                  <div className="border-b border-dashed border-slate-100">
-                    {Math.round(maxDoctorTotal * 0.75)}
+                  <div className="border-b border-dashed border-slate-200 flex justify-between items-center relative -top-2">
+                    <span className="bg-white/90 px-1 rounded text-slate-400">{Math.round(maxDoctorTotal * 0.75)}</span>
                   </div>
-                  <div className="border-b border-dashed border-slate-100">
-                    {Math.round(maxDoctorTotal * 0.5)}
+                  <div className="border-b border-dashed border-slate-200 flex justify-between items-center relative -top-2">
+                    <span className="bg-white/90 px-1 rounded text-slate-400">{Math.round(maxDoctorTotal * 0.5)}</span>
                   </div>
-                  <div className="border-b border-dashed border-slate-100">
-                    {Math.round(maxDoctorTotal * 0.25)}
+                  <div className="border-b border-dashed border-slate-200 flex justify-between items-center relative -top-2">
+                    <span className="bg-white/90 px-1 rounded text-slate-400">{Math.round(maxDoctorTotal * 0.25)}</span>
                   </div>
-                  <div>0</div>
+                  <div className="flex justify-between items-center relative -top-2">
+                    <span className="bg-white/90 px-1 rounded text-slate-400">0</span>
+                  </div>
                 </div>
 
                 {/* Grouped Bars */}
-                {topDoctors.map((doc, idx) => {
-                  const hDangXuLy = Math.max(
-                    (doc.dangXuLy / (maxDoctorTotal || 1)) * 180,
-                    doc.dangXuLy > 0 ? 6 : 2
-                  );
-                  const hDaHoanTat = Math.max(
-                    (doc.daHoanTat / (maxDoctorTotal || 1)) * 180,
-                    doc.daHoanTat > 0 ? 6 : 2
-                  );
+                <div className="w-full flex items-end justify-around z-10">
+                  {topDoctors.map((doc, idx) => {
+                    const hDangXuLy = Math.max(
+                      (doc.dangXuLy / maxDoctorTotal) * 190,
+                      doc.dangXuLy > 0 ? 6 : 2
+                    );
+                    const hDaHoanTat = Math.max(
+                      (doc.daHoanTat / maxDoctorTotal) * 190,
+                      doc.daHoanTat > 0 ? 6 : 2
+                    );
 
-                  return (
-                    <div key={idx} className="flex items-end gap-1.5 z-10 group cursor-pointer">
-                      {/* Đang xử lý */}
-                      <div
-                        className="w-4 sm:w-5 bg-[#0284c7] rounded-t-sm transition-all group-hover:brightness-95"
-                        style={{ height: `${hDangXuLy}px` }}
-                        title={`Đang xử lý: ${doc.dangXuLy}`}
-                      />
-                      {/* Đã hoàn tất */}
-                      <div
-                        className="w-4 sm:w-5 bg-[#10b981] rounded-t-sm transition-all group-hover:brightness-95"
-                        style={{ height: `${hDaHoanTat}px` }}
-                        title={`Đã hoàn tất: ${doc.daHoanTat}`}
-                      />
-                    </div>
-                  );
-                })}
+                    return (
+                      <div key={idx} className="flex flex-col items-center gap-1.5 group cursor-pointer">
+                        <div className="flex items-end gap-1.5">
+                          {/* Đang xử lý */}
+                          <div
+                            className="w-4 sm:w-5 bg-[#0284c7] rounded-t-sm transition-all group-hover:brightness-95"
+                            style={{ height: `${hDangXuLy}px` }}
+                            title={`Đang xử lý: ${doc.dangXuLy}`}
+                          />
+                          {/* Đã hoàn tất */}
+                          <div
+                            className="w-4 sm:w-5 bg-[#10b981] rounded-t-sm transition-all group-hover:brightness-95"
+                            style={{ height: `${hDaHoanTat}px` }}
+                            title={`Đã hoàn tất: ${doc.daHoanTat}`}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Legend for Doctor Chart */}

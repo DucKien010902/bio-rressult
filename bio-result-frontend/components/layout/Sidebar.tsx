@@ -35,6 +35,8 @@ export const MENU_CATEGORIES: CategoryItem[] = [
   { id: 'hpv24', label: 'Xét nghiệm HPV 24', icon: FileText },
   { id: 'soituoi', label: 'Xét nghiệm Soi tươi', icon: Microscope },
   { id: 'giaiphaubenh', label: 'Giải Phẫu Bệnh', icon: ClipboardList },
+  { id: 'giaiphaubenh_mobenh', label: 'Giải Phẫu Bệnh - Mô Bệnh', icon: ClipboardList },
+  { id: 'giaiphaubenh_tebaohoc', label: 'Giải Phẫu Bệnh - Tế Bào Học', icon: ClipboardList },
   { id: 'combo_hpv20_cell', label: 'Combo: HPV 20 + Cell', icon: Layers },
   { id: 'combo_hpv40_cell', label: 'Combo: HPV 40 + Cell', icon: Layers },
   { id: 'combo_hpv23_cell', label: 'Combo: HPV 23 + Cell', icon: Layers },
@@ -42,6 +44,44 @@ export const MENU_CATEGORIES: CategoryItem[] = [
   { id: 'combo_hpv40_thinprep', label: 'Combo: HPV 40 + ThinPrep', icon: Layers },
   { id: 'combo_hpv23_thinprep', label: 'Combo: HPV 23 + ThinPrep', icon: Layers },
 ];
+
+export const COMBO_REQUIRED_MAP: Record<string, [string, string]> = {
+  combo_hpv20_cell: ['hpv20', 'cell'],
+  combo_hpv40_cell: ['hpv40', 'cell'],
+  combo_hpv23_cell: ['hpv23', 'cell'],
+  combo_hpv20_thinprep: ['hpv20', 'thinprep'],
+  combo_hpv40_thinprep: ['hpv40', 'thinprep'],
+  combo_hpv23_thinprep: ['hpv23', 'thinprep'],
+};
+
+export function isCategoryPermitted(catId: string, user?: any): boolean {
+  if (!user) return true;
+  const role = user.role;
+  if (
+    role === 'admin' ||
+    role === 'superadmin' ||
+    user.username === 'admin' ||
+    user.username === 'superadmin'
+  ) {
+    return true;
+  }
+  // Các mục điều hướng chung luôn hiển thị
+  if (catId === 'dashboard' || catId === 'all') {
+    return true;
+  }
+  const allowed: string[] = Array.isArray(user.allowedCategories) ? user.allowedCategories : [];
+  if (allowed.length === 0) {
+    return false;
+  }
+  // Nếu là gói Combo: BẮT BUỘC CẢ 2 DỊCH VỤ THÀNH PHẦN PHẢI NẰM TRONG allowedCategories
+  if (catId.startsWith('combo_')) {
+    const required = COMBO_REQUIRED_MAP[catId];
+    if (!required) return false;
+    return allowed.includes(required[0]) && allowed.includes(required[1]);
+  }
+  // Dịch vụ đơn lẻ: phải nằm trong allowedCategories
+  return allowed.includes(catId);
+}
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -60,11 +100,47 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
 
-  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
-  const isAdmin = currentUser?.role === 'admin' || currentUser?.username === 'admin' || isSuperAdmin;
-  const isLab = currentUser?.role === 'lab';
+  const [effectiveUser, setEffectiveUser] = React.useState<any>(currentUser || null);
+
+  React.useEffect(() => {
+    if (currentUser) {
+      setEffectiveUser(currentUser);
+    } else if (typeof window !== 'undefined') {
+      try {
+        const u = JSON.parse(localStorage.getItem('bio_user') || 'null');
+        setEffectiveUser(u);
+      } catch {}
+    }
+  }, [currentUser]);
+
+  // Luôn lắng nghe nếu có sự thay đổi quyền từ máy chủ hoặc sự kiện storage
+  React.useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const u = JSON.parse(localStorage.getItem('bio_user') || 'null');
+        if (u) setEffectiveUser(u);
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('bio_user_updated', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('bio_user_updated', handleStorageChange);
+    };
+  }, []);
+
+  const isSuperAdmin =
+    effectiveUser?.role === 'superadmin' || effectiveUser?.username === 'superadmin';
+  const isAdmin =
+    effectiveUser?.role === 'admin' || effectiveUser?.username === 'admin' || isSuperAdmin;
+  const isLab = effectiveUser?.role === 'lab';
   // Chỉ Admin, Super Admin và tài khoản nguồn (lab) mới được tạo mẫu
   const canCreate = isAdmin || isLab;
+
+  // Lọc danh mục theo quyền hạn của tài khoản bác sĩ hoặc nguồn
+  const visibleCategories = React.useMemo(() => {
+    return MENU_CATEGORIES.filter((cat) => isCategoryPermitted(cat.id, effectiveUser));
+  }, [effectiveUser]);
 
   return (
     <aside
@@ -115,7 +191,7 @@ export default function Sidebar({
 
       {/* Navigation Categories — dùng Link để hoạt động từ mọi trang kể cả settings */}
       <div className="flex-1 overflow-y-auto py-2.5 px-2.5 space-y-1 custom-scrollbar">
-        {MENU_CATEGORIES.map((cat) => {
+        {visibleCategories.map((cat) => {
           const Icon = cat.icon;
           // Active khi ở trang chủ VÀ đúng category
           const isActive = pathname === '/' && activeCategory === cat.id;

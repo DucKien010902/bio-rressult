@@ -22,7 +22,7 @@ async function runSync() {
         soDienThoai: uDoc.soDienThoai || '',
         email: uDoc.email || '',
         signatureUrl: uDoc.signatureUrl || '',
-        allowedCategories: uDoc.allowedCategories || ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'soituoi', 'giaiphaubenh'],
+        allowedCategories: uDoc.allowedCategories || ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh', 'giaiphaubenh_mobenh', 'giaiphaubenh_tebaohoc'],
         userId: uDoc._id,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -52,7 +52,7 @@ async function runSync() {
         soDienThoai: uSrc.soDienThoai || '',
         email: uSrc.email || '',
         diaChi: uSrc.diaChi || '',
-        allowedCategories: uSrc.allowedCategories || ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'soituoi', 'giaiphaubenh'],
+        allowedCategories: uSrc.allowedCategories || ['cell', 'thinprep', 'hpv40', 'hpv20', 'hpv23', 'hpv24', 'soituoi', 'giaiphaubenh', 'giaiphaubenh_mobenh', 'giaiphaubenh_tebaohoc'],
         userId: uSrc._id,
         createdAt: new Date(),
         updatedAt: new Date()

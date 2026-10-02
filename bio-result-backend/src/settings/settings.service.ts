@@ -12,6 +12,8 @@ export const DEFAULT_TURNAROUND_HOURS: Record<string, number> = {
   hpv24: 48,
   soituoi: 4,
   giaiphaubenh: 72,
+  giaiphaubenh_mobenh: 72,
+  giaiphaubenh_tebaohoc: 72,
   combo_hpv20_cell: 48,
   combo_hpv40_cell: 48,
   combo_hpv23_cell: 48,

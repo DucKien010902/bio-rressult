@@ -111,6 +111,8 @@ const DEFAULT_CATEGORIES = [
   'hpv24',
   'soituoi',
   'giaiphaubenh',
+  'giaiphaubenh_mobenh',
+  'giaiphaubenh_tebaohoc',
   'combo_hpv20_cell',
   'combo_hpv40_cell',
   'combo_hpv23_cell',
@@ -296,16 +298,21 @@ export class UsersService {
     await doctor.save();
 
     // Đồng bộ sang tài khoản đăng nhập nếu có liên kết
+    const docUpdate: any = {
+      fullName: doctor.fullName,
+      title: doctor.title,
+      donVi: doctor.donVi,
+      signatureUrl: doctor.signatureUrl,
+      allowedCategories: doctor.allowedCategories,
+    };
+
     if (doctor.userId) {
-      await this.userModel.findByIdAndUpdate(doctor.userId, {
-        $set: {
-          fullName: doctor.fullName,
-          title: doctor.title,
-          donVi: doctor.donVi,
-          signatureUrl: doctor.signatureUrl,
-          allowedCategories: doctor.allowedCategories,
-        },
-      });
+      await this.userModel.findByIdAndUpdate(doctor.userId, { $set: docUpdate });
+    } else {
+      await this.userModel.updateMany(
+        { $or: [{ doctorId: doctor._id }, { username: doctor.code }] },
+        { $set: docUpdate },
+      );
     }
 
     return doctor;
@@ -458,16 +465,23 @@ export class UsersService {
 
     await source.save();
 
+    // Đồng bộ sang tài khoản User nếu có liên kết
+    const userUpdate: any = {
+      fullName: source.fullName,
+      donVi: source.donVi,
+      soDienThoai: source.soDienThoai,
+      email: source.email,
+      diaChi: source.diaChi,
+      allowedCategories: source.allowedCategories,
+    };
+
     if (source.userId) {
-      await this.userModel.findByIdAndUpdate(source.userId, {
-        $set: {
-          fullName: source.fullName,
-          donVi: source.donVi,
-          soDienThoai: source.soDienThoai,
-          email: source.email,
-          diaChi: source.diaChi,
-        },
-      });
+      await this.userModel.findByIdAndUpdate(source.userId, { $set: userUpdate });
+    } else {
+      await this.userModel.updateMany(
+        { $or: [{ sourceId: source._id }, { username: source.code }] },
+        { $set: userUpdate },
+      );
     }
 
     return source;

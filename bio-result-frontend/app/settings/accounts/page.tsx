@@ -373,7 +373,7 @@ export default function AccountsSettingsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs">
             <div>
               <Link
-                href="/"
+                href="/?category=all"
                 className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#0070f3] transition-colors mb-1.5"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />

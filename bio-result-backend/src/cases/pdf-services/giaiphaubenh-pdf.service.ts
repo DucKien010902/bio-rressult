@@ -30,6 +30,12 @@ export class GiaiphaubenhPdfService extends BasePdfService {
     const textColor = rgb(0.1, 0.15, 0.2);
     const blueColor = rgb(0.05, 0.25, 0.45);
 
+    // Mẫu GPB Tế Bào Học (Tuyến vú, tuyến giáp) tiêu đề dài hơn nên toàn bộ bảng bị đẩy xuống 4.56 pt
+    const isTebaoHoc =
+      caseItem?.loaiXetNghiem === 'giaiphaubenh_tebaohoc' ||
+      templateId === 'giaiphaubenh_tebaohoc_default';
+    const dY = isTebaoHoc ? -4.56 : 0;
+
     // Helper vẽ chữ trong suốt (hoàn toàn không nền trắng)
     const drawText = (
       text: string,
@@ -41,7 +47,7 @@ export class GiaiphaubenhPdfService extends BasePdfService {
       const font = opt.bold ? fontB : fontR;
       const size = opt.size || 9.0;
       const color = opt.color || textColor;
-      pg.drawText(String(text), { x, y, size, font, color });
+      pg.drawText(String(text), { x, y: y + dY, size, font, color });
     };
 
     // Helper căn giữa chữ trong khoảng [minX, maxX]
@@ -58,7 +64,7 @@ export class GiaiphaubenhPdfService extends BasePdfService {
       const color = opt.color || textColor;
       const textWidth = font.widthOfTextAtSize(String(text), size);
       const x = minX + (maxX - minX - textWidth) / 2;
-      pg.drawText(String(text), { x, y, size, font, color });
+      pg.drawText(String(text), { x, y: y + dY, size, font, color });
     };
 
     // Helper ngắt dòng tự động (không nền trắng)
@@ -77,7 +83,7 @@ export class GiaiphaubenhPdfService extends BasePdfService {
 
       const words = String(text).split(' ');
       let currentLine = '';
-      let currentY = startY;
+      let currentY = startY + dY;
 
       for (const w of words) {
         const testLine = currentLine ? `${currentLine} ${w}` : w;
@@ -99,25 +105,25 @@ export class GiaiphaubenhPdfService extends BasePdfService {
     const X_LEFT = 140.0;
     const X_RIGHT = 399.5;
 
-    drawText(caseItem.maSo, X_LEFT, 709.2, { bold: true, size: 9.5 });
+    drawText(caseItem.maSo, X_LEFT, 707.2, { bold: true, size: 9.5 });
     drawText(
       (caseItem.hoTen || '').toUpperCase(),
       X_RIGHT,
-      709.2,
+      707.2,
       { bold: true, size: 9.5 },
     );
 
-    drawText(String(caseItem.namSinh || ''), X_LEFT, 690.4, { size: 9.0 });
-    drawText(caseItem.gioiTinh || 'Nữ', X_RIGHT, 690.4, { size: 9.0 });
+    drawText(String(caseItem.namSinh || ''), X_LEFT, 688.3, { size: 9.0 });
+    drawText(caseItem.gioiTinh || 'Nữ', X_RIGHT, 688.3, { size: 9.0 });
 
-    drawText(caseItem.diaChi || '', X_LEFT, 671.7, { size: 8.5 });
+    drawText(caseItem.diaChi || '', X_LEFT, 669.6, { size: 8.5 });
 
-    drawText(caseItem.soDienThoai || '', X_LEFT, 652.8, { size: 9.0 });
-    drawText(caseItem.bacSiChiDinh || '', X_RIGHT, 652.8, { size: 9.0 });
+    drawText(caseItem.soDienThoai || '', X_LEFT, 650.6, { size: 9.0 });
+    drawText(caseItem.bacSiChiDinh || '', X_RIGHT, 650.6, { size: 9.0 });
 
-    drawText(caseItem.donVi || '', X_LEFT, 633.8, { size: 9.0 });
+    drawText(caseItem.donVi || '', X_LEFT, 631.6, { size: 9.0 });
 
-    drawText(caseItem.chanDoanLamSang || '', X_LEFT, 612.9, { size: 9.0 });
+    drawText(caseItem.chanDoanLamSang || '', X_LEFT, 612.7, { size: 9.0 });
     drawText(caseItem.viTriBenhPham || '', X_LEFT, 595.6, { size: 9.0 });
 
     const tNhan = this.fmtDate(caseItem.ngayNhanMau || caseItem.createdAt);
@@ -125,7 +131,7 @@ export class GiaiphaubenhPdfService extends BasePdfService {
       caseItem.ngayTraKetQua || caseItem.ngayDuKienTra,
     );
     drawText(tNhan, X_LEFT, 577.6, { size: 9.0 });
-    drawText(tKq, X_RIGHT, 577.6, { size: 9.0 });
+    drawText(tKq, X_RIGHT, 577.4, { size: 9.0 });
 
     // --- 2. KẾT QUẢ GIẢI PHẪU BỆNH ---
     // Mô tả Đại thể (ĐẠI THỂ) - Vùng trắng dưới thanh ĐẠI THỂ
@@ -135,11 +141,12 @@ export class GiaiphaubenhPdfService extends BasePdfService {
     drawWrappedText(caseItem.viThe || '', 55.0, 392.0, 485, 14, { size: 9.0 });
 
     // --- 3. KẾT LUẬN ---
-    // Khung xanh nhạt KẾT LUẬN tại Y = 178.9
+    // Khung xanh nhạt KẾT LUẬN tại Y = 178.9 (đối với mẫu tế bào học: 179.2 để mép dưới chữ khớp chuẩn với chữ KẾT LUẬN:)
+    const ketLuanY = isTebaoHoc ? 179.2 : 178.9;
     drawWrappedText(
       caseItem.ketLuan || '',
       115.0,
-      178.9,
+      ketLuanY,
       420,
       13,
       { bold: true, size: 9.5, color: blueColor },
@@ -157,7 +164,7 @@ export class GiaiphaubenhPdfService extends BasePdfService {
     // Che dòng chữ chấm in sẵn "Hà Nội, ngày ..... tháng ..... năm 202..." tại Y = 132.8
     pg.drawRectangle({
       x: 345,
-      y: 128,
+      y: 128 + dY,
       width: 185,
       height: 12,
       color: rgb(1, 1, 1),
@@ -247,7 +254,7 @@ export class GiaiphaubenhPdfService extends BasePdfService {
           if (targetW > 180) targetW = 180;
 
           const sigX = centerX - targetW / 2;
-          const sigY = 82.0 - targetH / 2;
+          const sigY = 82.0 + dY - targetH / 2;
 
           pg.drawImage(embeddedSig, {
             x: sigX,
@@ -261,7 +268,7 @@ export class GiaiphaubenhPdfService extends BasePdfService {
 
     // Đóng con dấu đỏ công ty GenHD nếu đã được Admin xác nhận trả kết quả
     if (caseItem.trangThai === 'da_tra_ket_qua' || caseItem.status === 'diagnosed') {
-      await this.drawOfficialStamp(pdfDoc, pg, centerX, 65);
+      await this.drawOfficialStamp(pdfDoc, pg, centerX, 65 + dY);
     }
 
     // --- 5. ẢNH TIÊU BẢN GIẢI PHẪU BỆNH (Góc dưới bên trái, nếu có) ---
@@ -272,7 +279,7 @@ export class GiaiphaubenhPdfService extends BasePdfService {
         if (imgBuffer) {
           await this.drawFittedImage(pdfDoc, pg, imgBuffer, {
             x: 55,
-            y: 25,
+            y: 25 + dY,
             width: 185,
             height: 120,
           });

@@ -22,6 +22,8 @@ const CATEGORIES_OPTIONS = [
   { id: 'hpv24', label: 'Xét nghiệm HPV 24 Types' },
   { id: 'soituoi', label: 'Xét nghiệm Soi tươi' },
   { id: 'giaiphaubenh', label: 'Giải Phẫu Bệnh' },
+  { id: 'giaiphaubenh_mobenh', label: 'Giải Phẫu Bệnh - Mô Bệnh' },
+  { id: 'giaiphaubenh_tebaohoc', label: 'Giải Phẫu Bệnh - Tế Bào Học' },
   { id: 'combo_hpv20_cell', label: 'Combo: HPV 20 + Cell' },
   { id: 'combo_hpv40_cell', label: 'Combo: HPV 40 + Cell' },
   { id: 'combo_hpv23_cell', label: 'Combo: HPV 23 + Cell' },

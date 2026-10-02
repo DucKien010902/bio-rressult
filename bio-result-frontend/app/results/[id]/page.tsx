@@ -473,7 +473,7 @@ export default function CaseDetailPage() {
               {/* Back to List Button */}
               <div>
                 <button
-                  onClick={() => handleNavigate('/')}
+                  onClick={() => handleNavigate('/?category=all')}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-[#0070f3] transition-colors cursor-pointer"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -617,7 +617,7 @@ export default function CaseDetailPage() {
                   isSaving={isSaving}
                   currentUser={currentUser}
                 />
-              ) : caseData?.loaiXetNghiem === 'giaiphaubenh' ? (
+              ) : ['giaiphaubenh', 'giaiphaubenh_mobenh', 'giaiphaubenh_tebaohoc'].includes(caseData?.loaiXetNghiem) ? (
                 <GiaiphaubenhResultCard
                   caseData={caseData}
                   onChange={handleFieldChange}

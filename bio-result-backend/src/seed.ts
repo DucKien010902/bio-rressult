@@ -140,6 +140,8 @@ const ALL_CATEGORIES = [
   'hpv24',
   'soituoi',
   'giaiphaubenh',
+  'giaiphaubenh_mobenh',
+  'giaiphaubenh_tebaohoc',
   'combo_hpv20_cell',
   'combo_hpv40_cell',
   'combo_hpv23_cell',
@@ -588,8 +590,8 @@ async function seed() {
         }
       }
 
-      // D. GIẢI PHẪU BỆNH (GPB)
-      else if (cat === 'giaiphaubenh') {
+      // D. GIẢI PHẪU BỆNH (GPB), MÔ BỆNH & TẾ BÀO HỌC
+      else if (cat === 'giaiphaubenh' || cat === 'giaiphaubenh_mobenh' || cat === 'giaiphaubenh_tebaohoc') {
         baseCase.loaiMau = 'Bệnh phẩm sinh thiết / Phẫu thuật';
         baseCase.sampleType = 'Bệnh phẩm sinh thiết / Phẫu thuật';
         baseCase.anhGpb = imgDataUri;

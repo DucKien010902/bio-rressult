@@ -17,7 +17,7 @@ export default function SettingsNavTabs({ activeTab, extraActions }: SettingsNav
         <div>
           <div className="flex items-center gap-2 mb-1.5">
             <Link
-              href="/"
+              href="/?category=all"
               className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-[#0070f3] transition-colors"
             >
               <ArrowLeft className="w-3.5 h-3.5" />

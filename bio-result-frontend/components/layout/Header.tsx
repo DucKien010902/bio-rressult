@@ -65,18 +65,23 @@ export default function Header({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
 
-  // Lấy ngay user từ prop hoặc fallback trực tiếp từ localStorage để không bị trễ state khi tải lại trang
-  const activeUser =
-    currentUser ||
-    (typeof window !== 'undefined'
-      ? (() => {
-          try {
-            return JSON.parse(localStorage.getItem('bio_user') || 'null');
-          } catch {
-            return null;
-          }
-        })()
-      : null);
+  // Quản lý state user đồng bộ giữa SSR và Client (tránh lỗi Hydration Mismatch)
+  const [mountedUser, setMountedUser] = useState<any>(currentUser || null);
+
+  useEffect(() => {
+    if (currentUser) {
+      setMountedUser(currentUser);
+    } else if (typeof window !== 'undefined') {
+      try {
+        const u = JSON.parse(localStorage.getItem('bio_user') || 'null');
+        setMountedUser(u);
+      } catch {
+        setMountedUser(null);
+      }
+    }
+  }, [currentUser]);
+
+  const activeUser = currentUser || mountedUser;
 
   const isDoctor = activeUser?.role === 'doctor' || activeUser?.role === 'bacsy';
   const isSuperAdmin = activeUser?.role === 'superadmin' || activeUser?.username === 'superadmin';
@@ -305,18 +310,115 @@ export default function Header({
   };
 
   useEffect(() => {
+    if (!activeUser) return;
+
+    // 1. Tải danh sách thông báo ban đầu một lần khi vào trang
     fetchNotifications();
 
-    // Auto-polling mỗi 15s để đồng bộ thông báo thời gian thực giữa Nguồn, Admin và Bác sĩ
-    const interval = setInterval(fetchNotifications, 15000);
-    const onFocus = () => fetchNotifications();
+    // 2. Thiết lập kết nối thời gian thực SSE (Server-Sent Events) - thay thế hoàn toàn polling 15s
+    let eventSource: EventSource | null = null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('bio_token') : null;
+
+    if (token && typeof window !== 'undefined' && 'EventSource' in window) {
+      try {
+        const streamUrl = getApiUrl('/notifications/stream');
+        const qs = getNotificationParams();
+        const fullUrl = `${streamUrl}?token=${encodeURIComponent(token)}${qs ? `&${qs}` : ''}`;
+
+        eventSource = new EventSource(fullUrl);
+
+        // Nhận thông báo thời gian thực từ Backend ngay khi có ca mới hoặc bác sĩ ký duyệt
+        eventSource.addEventListener('notification', (e: MessageEvent) => {
+          try {
+            const newNoti: NotificationItem = JSON.parse(e.data);
+            if (!newNoti || !newNoti._id) return;
+
+            // KIỂM TRA NGHIÊM NGẶT: Chỉ hiển thị khi chính tài khoản đang đăng nhập là bên nhận!
+            if (isAdmin) {
+              // Admin & SuperAdmin CHỈ nhận thông báo gửi cho admin hoặc cho all
+              // Tuyệt đối không nhận thông báo phân công của Bác sĩ (doctor) hoặc tiếp nhận/trả kết quả của Lab (source)
+              if (newNoti.recipientRole !== 'admin' && newNoti.recipientRole !== 'all') {
+                return;
+              }
+            } else if (isDoctor) {
+              // Bác sĩ chỉ nhận thông báo phân công cho bác sĩ (đúng tên hoặc username của mình) hoặc all
+              if (newNoti.recipientRole !== 'doctor' && newNoti.recipientRole !== 'all') {
+                return;
+              }
+              if (newNoti.recipientRole === 'doctor') {
+                const curDoc = (activeUser?.fullName || '').toLowerCase().trim();
+                const notiDoc = (newNoti.doctorName || '').toLowerCase().trim();
+                const curUser = (activeUser?.username || '').toLowerCase().trim();
+                const notiUser = (newNoti.recipientRole || '').toLowerCase().trim();
+                const matchDoc = curDoc && notiDoc && (notiDoc.includes(curDoc) || curDoc.includes(notiDoc));
+                const matchUser = curUser && notiUser && curUser === notiUser;
+                if (!matchDoc && !matchUser) return;
+              }
+            } else if (isSource) {
+              // Nguồn / Lab chỉ nhận thông báo tiếp nhận mẫu hoặc trả kết quả cho đơn vị mình hoặc all
+              if (newNoti.recipientRole !== 'source' && newNoti.recipientRole !== 'all') {
+                return;
+              }
+              if (newNoti.recipientRole === 'source') {
+                const curSrc = (activeUser?.donVi || activeUser?.fullName || '').toLowerCase().trim();
+                const notiSrc = (newNoti.sourceName || '').toLowerCase().trim();
+                const curUser = (activeUser?.username || '').toLowerCase().trim();
+                const notiUser = (newNoti.recipientRole || '').toLowerCase().trim();
+                const matchSrc = curSrc && notiSrc && (notiSrc.includes(curSrc) || curSrc.includes(notiSrc));
+                const matchUser = curUser && notiUser && curUser === notiUser;
+                if (!matchSrc && !matchUser) return;
+              }
+            }
+
+            // Cập nhật danh sách thông báo và số lượng chưa đọc ngay lập tức
+            setNotifications((prev) => {
+              if (prev.some((n) => n._id === newNoti._id)) return prev;
+              return [newNoti, ...prev];
+            });
+            setUnreadCount((prev) => prev + 1);
+
+            // Ghi nhận ID đã hiển thị
+            seenNotiIdsRef.current.add(newNoti._id);
+
+            // 1. Phát âm thanh chuông báo
+            playNotificationSound();
+
+            // 2. Hiển thị Toast thông báo trên giao diện web
+            toast.notification(newNoti.message, newNoti.title, {
+              duration: 6000,
+              actionUrl: newNoti.testResultId ? `/results/${newNoti.testResultId}` : undefined,
+              actionLabel: 'Xem phiếu xét nghiệm',
+            });
+
+            // 3. Bắn banner thông báo trực tiếp ra màn hình máy tính Windows (Desktop Notification)
+            sendDesktopNotification(newNoti.title, newNoti.message, newNoti.testResultId);
+          } catch (err) {
+            console.error('Error handling SSE notification event:', err);
+          }
+        });
+
+        eventSource.onerror = () => {
+          // EventSource tự động reconnect ngầm theo chuẩn HTML5 khi mạng gián đoạn
+          console.debug('SSE stream connecting / reconnecting...');
+        };
+      } catch (err) {
+        console.error('Failed to initialize EventSource:', err);
+      }
+    }
+
+    // 3. Đồng bộ nhẹ nhàng khi người dùng click quay lại tab web sau thời gian dài
+    const onFocus = () => {
+      fetchNotifications();
+    };
     window.addEventListener('focus', onFocus);
 
     return () => {
-      clearInterval(interval);
+      if (eventSource) {
+        eventSource.close();
+      }
       window.removeEventListener('focus', onFocus);
     };
-  }, [currentUser]);
+  }, [activeUser?.username, activeUser?.role]);
 
   // Handle outside click for notification & settings dropdowns
   useEffect(() => {

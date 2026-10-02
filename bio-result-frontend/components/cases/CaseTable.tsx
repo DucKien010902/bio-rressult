@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -68,6 +69,8 @@ export const CATEGORY_NAMES_MAP: Record<string, string> = {
   hpv24: 'Xét nghiệm HPV 24',
   soituoi: 'Xét nghiệm Soi tươi',
   giaiphaubenh: 'Giải Phẫu Bệnh',
+  giaiphaubenh_mobenh: 'Giải Phẫu Bệnh - Mô Bệnh',
+  giaiphaubenh_tebaohoc: 'Giải Phẫu Bệnh - Tế Bào Học',
   combo_hpv20_cell: 'Combo HPV 20 + Cell',
   combo_hpv40_cell: 'Combo HPV 40 + Cell',
   combo_hpv23_cell: 'Combo HPV 23 + Cell',
@@ -147,7 +150,7 @@ function getCaseTurnaroundInfo(
     turnaroundMap[item.loaiXetNghiem] ||
     (item.loaiXetNghiem?.startsWith('hpv') || item.loaiXetNghiem?.startsWith('combo')
       ? 48
-      : item.loaiXetNghiem === 'giaiphaubenh'
+      : ['giaiphaubenh', 'giaiphaubenh_mobenh', 'giaiphaubenh_tebaohoc'].includes(item.loaiXetNghiem)
       ? 72
       : item.loaiXetNghiem === 'soituoi'
       ? 4
@@ -243,6 +246,8 @@ export default function CaseTable({
       hpv24: 48,
       soituoi: 4,
       giaiphaubenh: 72,
+      giaiphaubenh_mobenh: 72,
+      giaiphaubenh_tebaohoc: 72,
       combo_hpv20_cell: 48,
       combo_hpv40_cell: 48,
       combo_hpv23_cell: 48,
@@ -288,6 +293,25 @@ export default function CaseTable({
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [openActionId, setOpenActionId] = useState<string | null>(null);
+  const [actionMenuPos, setActionMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [actionMenuCase, setActionMenuCase] = useState<CaseItem | null>(null);
+
+  useEffect(() => {
+    if (!openActionId) return;
+    const handleCloseMenu = () => {
+      setOpenActionId(null);
+      setActionMenuPos(null);
+      setActionMenuCase(null);
+    };
+    window.addEventListener('scroll', handleCloseMenu, true);
+    window.addEventListener('resize', handleCloseMenu);
+    window.addEventListener('click', handleCloseMenu);
+    return () => {
+      window.removeEventListener('scroll', handleCloseMenu, true);
+      window.removeEventListener('resize', handleCloseMenu);
+      window.removeEventListener('click', handleCloseMenu);
+    };
+  }, [openActionId]);
 
   // Admin permission
   const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.username === 'superadmin';
@@ -890,107 +914,37 @@ export default function CaseTable({
                             </button>
                           )}
 
-                          {/* 3 dots menu button - luôn cố định sát lề phải */}
+                          {/* 3 dots menu button - mở menu nổi cố định (Portal) */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setOpenActionId(openActionId === item._id ? null : item._id);
+                              if (openActionId === item._id) {
+                                setOpenActionId(null);
+                                setActionMenuPos(null);
+                                setActionMenuCase(null);
+                              } else {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const right = Math.max(16, window.innerWidth - rect.right);
+                                const spaceBelow = window.innerHeight - rect.bottom;
+                                const ESTIMATED_MENU_HEIGHT = 160;
+                                
+                                let top: number;
+                                if (spaceBelow < ESTIMATED_MENU_HEIGHT && rect.top > ESTIMATED_MENU_HEIGHT) {
+                                  top = rect.top - ESTIMATED_MENU_HEIGHT - 4;
+                                } else {
+                                  top = rect.bottom + 4;
+                                }
+
+                                setActionMenuPos({ top, right });
+                                setActionMenuCase(item);
+                                setOpenActionId(item._id);
+                              }
                             }}
                             className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
                         </div>
-
-                        {openActionId === item._id && (
-                          <div
-                            className={`absolute right-4 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 text-left transition-all ${
-                              isLastRows
-                                ? 'bottom-9 mb-1 animate-in fade-in slide-in-from-bottom-2'
-                                : 'top-10 animate-in fade-in slide-in-from-top-1'
-                            }`}
-                            onMouseLeave={() => setOpenActionId(null)}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {/* 1. Tải kết quả (PDF) */}
-                            <button
-                              disabled={downloadingCaseId === item._id}
-                              onClick={async () => {
-                                setOpenActionId(null);
-                                try {
-                                  setDownloadingCaseId(item._id);
-                                  toast.info(`Đang tải PDF phiếu ${item.maSo || ''}...`, 'Đang xử lý');
-                                  await downloadCasePdf({
-                                    caseId: item._id,
-                                    patientName: item.hoTen,
-                                    maSo: item.maSo,
-                                  });
-                                  toast.success(`Đã tải PDF phiếu ${item.maSo || ''} thành công!`, 'Tải hoàn tất');
-                                } catch (err: any) {
-                                  console.error('Lỗi khi tải PDF:', err);
-                                  toast.error(err.message || 'Không thể tải file PDF!', 'Lỗi tải xuống');
-                                } finally {
-                                  setDownloadingCaseId(null);
-                                }
-                              }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer disabled:opacity-50"
-                            >
-                              {downloadingCaseId === item._id ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
-                              ) : (
-                                <Download className="w-4 h-4 text-emerald-600" />
-                              )}
-                              <span>
-                                {downloadingCaseId === item._id ? 'Đang tải PDF...' : 'Tải kết quả (PDF)'}
-                              </span>
-                            </button>
-
-                            {/* 1.5 Lịch sử thao tác (Chỉ hiển thị cho Admin / Super Admin) */}
-                            {isAdmin && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setOpenActionId(null);
-                                  setSelectedCaseForHistory(item);
-                                  setShowHistoryModal(true);
-                                }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer text-left"
-                              >
-                                <History className="w-4 h-4 text-amber-600" />
-                                <span>Lịch sử thao tác</span>
-                              </button>
-                            )}
-
-                            {/* 2. Sửa thông tin phiếu */}
-                            <Link
-                              href={`/results/${item._id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() => setOpenActionId(null)}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-purple-600 transition-colors cursor-pointer"
-                            >
-                              <Edit3 className="w-4 h-4 text-purple-600" />
-                              <span>Sửa thông tin phiếu</span>
-                            </Link>
-
-                            {/* 3. Xóa phiếu (Chỉ dành cho Admin phòng Lab) */}
-                            {isAdmin && (
-                              <>
-                                <div className="border-t border-slate-100 my-1" />
-                                <button
-                                  onClick={() => {
-                                    setOpenActionId(null);
-                                    handleDelete(item._id, item.maSo);
-                                  }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                                >
-                                  <Trash2 className="w-4 h-4 text-red-500" />
-                                  <span>Xóa phiếu này</span>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
                       </td>
                     </tr>
                   );
@@ -1246,6 +1200,113 @@ export default function CaseTable({
             </div>
           </div>
         </div>
+      )}
+
+      {/* FLOATING ACTION MENU VIA REACT PORTAL */}
+      {openActionId && actionMenuCase && actionMenuPos && typeof window !== 'undefined' && createPortal(
+        <div
+          className="fixed w-44 bg-white rounded-xl shadow-2xl border border-slate-200 py-1.5 z-[9999] text-left animate-in fade-in zoom-in-95 duration-100"
+          style={{
+            top: `${actionMenuPos.top}px`,
+            right: `${actionMenuPos.right}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* 1. Tải kết quả (PDF) */}
+          <button
+            disabled={downloadingCaseId === actionMenuCase._id}
+            onClick={async (e) => {
+              e.stopPropagation();
+              const targetCase = actionMenuCase;
+              setOpenActionId(null);
+              setActionMenuPos(null);
+              setActionMenuCase(null);
+              try {
+                setDownloadingCaseId(targetCase._id);
+                toast.info(`Đang tải PDF phiếu ${targetCase.maSo || ''}...`, 'Đang xử lý');
+                await downloadCasePdf({
+                  caseId: targetCase._id,
+                  patientName: targetCase.hoTen,
+                  maSo: targetCase.maSo,
+                });
+                toast.success(`Đã tải PDF phiếu ${targetCase.maSo || ''} thành công!`, 'Tải hoàn tất');
+              } catch (err: any) {
+                console.error('Lỗi khi tải PDF:', err);
+                toast.error(err.message || 'Không thể tải file PDF!', 'Lỗi tải xuống');
+              } finally {
+                setDownloadingCaseId(null);
+              }
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {downloadingCaseId === actionMenuCase._id ? (
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+            ) : (
+              <Download className="w-4 h-4 text-emerald-600" />
+            )}
+            <span>
+              {downloadingCaseId === actionMenuCase._id ? 'Đang tải PDF...' : 'Tải kết quả (PDF)'}
+            </span>
+          </button>
+
+          {/* 1.5 Lịch sử thao tác (Chỉ hiển thị cho Admin / Super Admin) */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const targetCase = actionMenuCase;
+                setOpenActionId(null);
+                setActionMenuPos(null);
+                setActionMenuCase(null);
+                setSelectedCaseForHistory(targetCase);
+                setShowHistoryModal(true);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors cursor-pointer text-left"
+            >
+              <History className="w-4 h-4 text-amber-600" />
+              <span>Lịch sử thao tác</span>
+            </button>
+          )}
+
+          {/* 2. Sửa thông tin phiếu */}
+          <Link
+            href={`/results/${actionMenuCase._id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => {
+              setOpenActionId(null);
+              setActionMenuPos(null);
+              setActionMenuCase(null);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-purple-600 transition-colors cursor-pointer"
+          >
+            <Edit3 className="w-4 h-4 text-purple-600" />
+            <span>Sửa thông tin phiếu</span>
+          </Link>
+
+          {/* 3. Xóa phiếu (Chỉ dành cho Admin phòng Lab) */}
+          {isAdmin && (
+            <>
+              <div className="border-t border-slate-100 my-1" />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const targetCase = actionMenuCase;
+                  setOpenActionId(null);
+                  setActionMenuPos(null);
+                  setActionMenuCase(null);
+                  handleDelete(targetCase._id, targetCase.maSo);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4 text-red-500" />
+                <span>Xóa phiếu này</span>
+              </button>
+            </>
+          )}
+        </div>,
+        document.body
       )}
 
       {/* MODAL LỊCH SỬ THAO TÁC PHIẾU */}

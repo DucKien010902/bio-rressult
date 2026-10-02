@@ -306,6 +306,28 @@ export class CasesController {
     // If LAB role, use provided donVi or fallback to their default donVi
     if (req.user?.role === 'lab') {
       data.donVi = data.donVi?.trim() || req.user.donVi || '';
+
+      // Kiểm tra quyền tạo loại xét nghiệm đối với tài khoản nguồn (lab)
+      const cat = (data.loaiXetNghiem || data.testType || '').toLowerCase();
+      const allowedCategories: string[] = req.user.allowedCategories || [];
+      if (allowedCategories.length > 0) {
+        if (cat.startsWith('combo_')) {
+          const comboMap: Record<string, [string, string]> = {
+            combo_hpv20_cell: ['hpv20', 'cell'],
+            combo_hpv40_cell: ['hpv40', 'cell'],
+            combo_hpv23_cell: ['hpv23', 'cell'],
+            combo_hpv20_thinprep: ['hpv20', 'thinprep'],
+            combo_hpv40_thinprep: ['hpv40', 'thinprep'],
+            combo_hpv23_thinprep: ['hpv23', 'thinprep'],
+          };
+          const parts = comboMap[cat];
+          if (!parts || !allowedCategories.includes(parts[0]) || !allowedCategories.includes(parts[1])) {
+            throw new ForbiddenException('Đơn vị của bạn không được cấp phép dịch vụ gói combo này!');
+          }
+        } else if (!allowedCategories.includes(cat)) {
+          throw new ForbiddenException('Đơn vị của bạn không được cấp phép dịch vụ xét nghiệm này!');
+        }
+      }
     }
     // Chỉ có Admin & Super Admin mới có quyền gán bác sĩ đọc KQ khi tạo mới
     if (req.user?.role !== 'admin' && req.user?.role !== 'superadmin') {

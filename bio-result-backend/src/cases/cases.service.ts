@@ -246,6 +246,8 @@ export class CasesService {
     if (c.includes('thinprep')) return 'Tế bào học ThinPrep';
     if (c.includes('cell')) return 'Tế bào học âm đạo';
     if (c.includes('soituoi')) return 'Soi tươi dịch âm đạo';
+    if (c.includes('giaiphaubenh_mobenh') || c.includes('mobenh')) return 'Giải phẫu bệnh - Mô bệnh';
+    if (c.includes('giaiphaubenh_tebaohoc') || c.includes('tebaohoc')) return 'Giải phẫu bệnh - Tế bào học';
     if (c.includes('giaiphaubenh') || c.includes('gpb')) return 'Giải phẫu bệnh';
     return cat;
   }
@@ -318,11 +320,24 @@ export class CasesService {
       if (saved.bacSiDoc) {
         await this.notificationsService.createNotification({
           title: `Bạn có ca xét nghiệm mới cần đọc KQ: ${saved.maSo}`,
-          message: `Bạn được phân công đọc kết quả xét nghiệm cho bệnh nhân ${saved.hoTen} (${saved.maSo}) - Dịch vụ: ${this.getCategoryLabel(saved.loaiXetNghiem)}. Vui lòng kiểm tra và chẩn đoán.`,
+          message: `Bạn được phân công đọc kết quả xét nghiệm cho bệnh nhân ${saved.hoTen} (${saved.maSo}) - Dịch vụ: ${this.getCategoryLabel(saved.loaiXetNghiem)}${saved.loaiXetNghiem?.startsWith('combo_') ? ' (Phần 1: HPV)' : ''}. Vui lòng kiểm tra và chẩn đoán.`,
           testResultId: saved._id.toString(),
           caseCode: saved.maSo,
           patientName: saved.hoTen,
           doctorName: saved.bacSiDoc,
+          recipientRole: 'doctor',
+          type: 'doctor_assigned',
+        });
+      }
+
+      if (saved.bacSiDoc2 && saved.bacSiDoc2 !== saved.bacSiDoc) {
+        await this.notificationsService.createNotification({
+          title: `Bạn có ca xét nghiệm mới cần đọc KQ: ${saved.maSo}`,
+          message: `Bạn được phân công đọc kết quả xét nghiệm cho bệnh nhân ${saved.hoTen} (${saved.maSo}) - Dịch vụ: ${this.getCategoryLabel(saved.loaiXetNghiem)} (Phần 2: Tế bào/ThinPrep). Vui lòng kiểm tra và chẩn đoán.`,
+          testResultId: saved._id.toString(),
+          caseCode: saved.maSo,
+          patientName: saved.hoTen,
+          doctorName: saved.bacSiDoc2,
           recipientRole: 'doctor',
           type: 'doctor_assigned',
         });
@@ -1005,6 +1020,8 @@ export class CasesService {
       { key: 'hpv23', label: 'HPV 23', color: '#06b6d4', icon: 'testtube2' },
       { key: 'soituoi', label: 'Soi tươi', color: '#10b981', icon: 'microscope' },
       { key: 'giaiphaubenh', label: 'GPB', color: '#f59e0b', icon: 'filetext' },
+      { key: 'giaiphaubenh_mobenh', label: 'GPB-MB', color: '#d97706', icon: 'filetext' },
+      { key: 'giaiphaubenh_tebaohoc', label: 'GPB-TB', color: '#b45309', icon: 'filetext' },
     ];
 
     const byCategory = await Promise.all(
@@ -1216,6 +1233,8 @@ export class CasesService {
       hpv23: 'Xét nghiệm HPV 23 Types',
       soituoi: 'Xét nghiệm Soi tươi',
       giaiphaubenh: 'Giải Phẫu Bệnh',
+      giaiphaubenh_mobenh: 'Giải Phẫu Bệnh - Mô Bệnh',
+      giaiphaubenh_tebaohoc: 'Giải Phẫu Bệnh - Tế Bào Học',
       combo_hpv20_cell: 'Combo HPV 20 + Cell',
       combo_hpv40_cell: 'Combo HPV 40 + Cell',
       combo_hpv23_cell: 'Combo HPV 23 + Cell',

@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, MessageEvent } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { Subject, Observable, interval, merge } from 'rxjs';
+import { map, filter } from 'rxjs/operators';
 import { Notification, NotificationDocument } from './schemas/notification.schema.js';
 import { BioCase } from '../cases/schemas/case.schema.js';
 
@@ -13,6 +15,8 @@ function toSafeString(val: any): string {
 
 @Injectable()
 export class NotificationsService {
+  private notiStream$ = new Subject<any>();
+
   constructor(
     @InjectModel(Notification.name)
     private notiModel: Model<NotificationDocument>,
@@ -33,10 +37,17 @@ export class NotificationsService {
     type?: string;
   }) {
     try {
-      return await this.notiModel.create({
+      const created = await this.notiModel.create({
         ...data,
         isRead: false,
       });
+
+      if (created) {
+        const notiObj = created.toObject ? created.toObject() : created;
+        this.notiStream$.next(notiObj);
+      }
+
+      return created;
     } catch (e) {
       console.error('[NotificationsService] Error creating notification:', e);
       return null;
@@ -65,12 +76,10 @@ export class NotificationsService {
     const query: any = {};
 
     if (role === 'admin' || role === 'superadmin' || username === 'admin' || username === 'superadmin') {
-      // Admin sees notifications for admin, for all, or general updates
+      // Admin & SuperAdmin CHỈ nhận thông báo cho admin hoặc cho all
       query.$or = [
         { recipientRole: 'admin' },
         { recipientRole: 'all' },
-        { recipientRole: { $exists: false } },
-        { recipientRole: '' },
       ];
     } else if (role === 'doctor' || role === 'bacsy') {
       const orList: any[] = [{ recipientRole: 'all' }];
@@ -119,6 +128,93 @@ export class NotificationsService {
       notifications,
       unreadCount,
     };
+  }
+
+  isRecipient(
+    noti: any,
+    params: { doctor?: string; role?: string; source?: string; username?: string },
+  ): boolean {
+    const role = toSafeString(params.role);
+    const doctor = toSafeString(params.doctor);
+    const source = toSafeString(params.source);
+    const username = toSafeString(params.username);
+
+    if (!role && !username && !doctor && !source) {
+      return false;
+    }
+
+    // 1. Admin & SuperAdmin có quyền tương đương nhau:
+    // CHỈ nhận thông báo gửi cho admin hoặc thông báo chung (all).
+    // Tuyệt đối không nhận thông báo phân công của Bác sĩ (doctor) hoặc tiếp nhận/trả kết quả của Nguồn (source).
+    if (role === 'admin' || role === 'superadmin' || username === 'admin' || username === 'superadmin') {
+      return noti.recipientRole === 'admin' || noti.recipientRole === 'all';
+    }
+
+    // 2. Thông báo chung toàn hệ thống
+    if (noti.recipientRole === 'all') {
+      return true;
+    }
+
+    // 3. Bác sĩ (hỗ trợ cả trường hợp Combo phân 2 Bác sĩ khác nhau)
+    if (role === 'doctor' || role === 'bacsy') {
+      if (noti.recipientRole === 'doctor') {
+        if (username && noti.recipientUsername && noti.recipientUsername.toLowerCase() === username.toLowerCase()) {
+          return true;
+        }
+        if (doctor && noti.doctorName) {
+          const docTarget = noti.doctorName.toLowerCase();
+          const curDoc = doctor.toLowerCase();
+          if (docTarget.includes(curDoc) || curDoc.includes(docTarget)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // 4. Nguồn / Lab
+    if (role === 'lab' || role === 'source') {
+      if (noti.recipientRole === 'source') {
+        if (username && noti.recipientUsername && noti.recipientUsername.toLowerCase() === username.toLowerCase()) {
+          return true;
+        }
+        if (source && noti.sourceName) {
+          const srcTarget = noti.sourceName.toLowerCase();
+          const curSrc = source.toLowerCase();
+          if (srcTarget.includes(curSrc) || curSrc.includes(srcTarget)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    return false;
+  }
+
+  getNotificationStream(params: {
+    doctor?: string;
+    role?: string;
+    source?: string;
+    username?: string;
+  }): Observable<MessageEvent> {
+    const notifications$ = this.notiStream$.pipe(
+      filter((noti) => this.isRecipient(noti, params)),
+      map((noti) => ({
+        type: 'notification',
+        data: noti,
+      } as MessageEvent)),
+    );
+
+    // Heartbeat ping mỗi 25 giây để giữ kết nối SSE luôn sống trên Render / Nginx / Reverse Proxy
+    const heartbeat$ = interval(25000).pipe(
+      map(() => ({
+        type: 'ping',
+        data: { time: Date.now() },
+      } as MessageEvent)),
+    );
+
+    return merge(notifications$, heartbeat$);
   }
 
   async markRead(

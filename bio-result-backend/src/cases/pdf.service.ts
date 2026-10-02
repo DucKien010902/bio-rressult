@@ -108,6 +108,24 @@ export const PDF_TEMPLATES_CATALOG: PdfTemplateOption[] = [
     isDefault: true,
     description: 'Phiếu kết quả mô bệnh học kèm ảnh tiêu bản đầy đủ logo',
   },
+  // 7b. Giải Phẫu Bệnh - Mô Bệnh
+  {
+    id: 'giaiphaubenh_mobenh_default',
+    name: 'Mẫu chuẩn Giải Phẫu Bệnh - Mô Bệnh',
+    category: 'giaiphaubenh_mobenh',
+    templateFile: 'sample_giaiphaubenh_mobenh.pdf',
+    isDefault: true,
+    description: 'Phiếu kết quả giải phẫu bệnh – mô bệnh đầy đủ logo',
+  },
+  // 7c. Giải Phẫu Bệnh - Tế Bào Học
+  {
+    id: 'giaiphaubenh_tebaohoc_default',
+    name: 'Mẫu chuẩn Giải Phẫu Bệnh - Tế Bào Học (Tuyến vú, tuyến giáp,...)',
+    category: 'giaiphaubenh_tebaohoc',
+    templateFile: 'sample_giaiphaubenh_tebaohoc.pdf',
+    isDefault: true,
+    description: 'Phiếu kết quả giải phẫu bệnh – tế bào học tuyến vú, tuyến giáp đầy đủ logo',
+  },
 
   // 8. Các gói Combo 2 trang
   {
@@ -266,8 +284,8 @@ export class PdfService {
     if (!fs.existsSync(fontBoldPath))
       fontBoldPath = 'C:/Windows/Fonts/arialbd.ttf';
 
-    const fontR = await pdfDoc.embedFont(fs.readFileSync(fontPath));
-    const fontB = await pdfDoc.embedFont(fs.readFileSync(fontBoldPath));
+    const fontR = await pdfDoc.embedFont(fs.readFileSync(fontPath), { subset: true });
+    const fontB = await pdfDoc.embedFont(fs.readFileSync(fontBoldPath), { subset: true });
 
     // Điều hướng đến từng Mô-đun Service chuyên biệt, truyền kèm templateId đã chọn
     if (cat === 'cell' || cat === 'thinprep') {
@@ -289,7 +307,11 @@ export class PdfService {
         0,
         selectedTpl?.id,
       );
-    } else if (cat === 'giaiphaubenh') {
+    } else if (
+      cat === 'giaiphaubenh' ||
+      cat === 'giaiphaubenh_mobenh' ||
+      cat === 'giaiphaubenh_tebaohoc'
+    ) {
       await this.giaiphaubenhPdfService.generatePdf(
         pdfDoc,
         caseItem,
@@ -316,7 +338,7 @@ export class PdfService {
       );
     }
 
-    const output = await pdfDoc.save();
+    const output = await pdfDoc.save({ useObjectStreams: true });
     return Buffer.from(output);
   }
 }
