@@ -45,7 +45,11 @@ export interface CaseItem {
   ngayDuKienTra: string;
   ngayTraKetQua: string;
   bacSiDoc: string;
+  bacSiDocUsername?: string;
+  bacSiDocId?: string;
   bacSiDoc2?: string;
+  bacSiDoc2Username?: string;
+  bacSiDoc2Id?: string;
   daKy: boolean;
   daKy2?: boolean;
   trangThai: 'nhap_thong_tin' | 'chay_ket_qua' | 'da_tra_ket_qua';
@@ -151,10 +155,10 @@ function getCaseTurnaroundInfo(
     (item.loaiXetNghiem?.startsWith('hpv') || item.loaiXetNghiem?.startsWith('combo')
       ? 48
       : ['giaiphaubenh', 'giaiphaubenh_mobenh', 'giaiphaubenh_tebaohoc'].includes(item.loaiXetNghiem)
-      ? 72
-      : item.loaiXetNghiem === 'soituoi'
-      ? 4
-      : 24);
+        ? 72
+        : item.loaiXetNghiem === 'soituoi'
+          ? 4
+          : 24);
 
   let deadlineDate: Date;
   if (item.ngayDuKienTra) {
@@ -234,7 +238,7 @@ export default function CaseTable({
       if (cached) {
         try {
           return JSON.parse(cached);
-        } catch {}
+        } catch { }
       }
     }
     return {
@@ -320,8 +324,8 @@ export default function CaseTable({
   // Accept sample modal states
   const [showAcceptModal, setShowAcceptModal] = useState(false);
   const [selectedCaseForAccept, setSelectedCaseForAccept] = useState<CaseItem | null>(null);
-  const [selectedDoctorForAccept, setSelectedDoctorForAccept] = useState('TS.BS Nguyễn Sỹ Lãnh');
-  const [selectedDoctorForAccept2, setSelectedDoctorForAccept2] = useState('BS CK1 PHẠM THẾ HÙNG');
+  const [selectedDoctorForAccept, setSelectedDoctorForAccept] = useState('bacsi_lanh');
+  const [selectedDoctorForAccept2, setSelectedDoctorForAccept2] = useState('bacsi_hung');
   const [isAccepting, setIsAccepting] = useState(false);
 
   // History modal states
@@ -408,7 +412,7 @@ export default function CaseTable({
         const matchName = item.hoTen?.toLowerCase().includes(kw);
         const matchCode = item.maSo?.toLowerCase().includes(kw);
         const matchPhone = item.soDienThoai?.includes(kw);
-        
+
         // Tìm theo tên Nguồn / Đơn vị
         const sourceName =
           typeof item.nguoiNhap === 'object'
@@ -519,19 +523,17 @@ export default function CaseTable({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setActiveStatusTab('all')}
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                activeStatusTab === 'all'
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${activeStatusTab === 'all'
                   ? 'bg-[#0070f3] text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+                }`}
             >
               <span>Tất cả</span>
               <span
-                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${
-                  activeStatusTab === 'all'
+                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${activeStatusTab === 'all'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200 text-slate-600'
-                }`}
+                  }`}
               >
                 {counts.all}
               </span>
@@ -539,19 +541,17 @@ export default function CaseTable({
 
             <button
               onClick={() => setActiveStatusTab('nhap_thong_tin')}
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                activeStatusTab === 'nhap_thong_tin'
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${activeStatusTab === 'nhap_thong_tin'
                   ? 'bg-amber-500 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+                }`}
             >
               <span>Nhập thông tin</span>
               <span
-                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${
-                  activeStatusTab === 'nhap_thong_tin'
+                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${activeStatusTab === 'nhap_thong_tin'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200 text-slate-600'
-                }`}
+                  }`}
               >
                 {counts.nhap_thong_tin}
               </span>
@@ -559,19 +559,17 @@ export default function CaseTable({
 
             <button
               onClick={() => setActiveStatusTab('chay_ket_qua')}
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                activeStatusTab === 'chay_ket_qua'
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${activeStatusTab === 'chay_ket_qua'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+                }`}
             >
               <span>Chạy kết quả</span>
               <span
-                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${
-                  activeStatusTab === 'chay_ket_qua'
+                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${activeStatusTab === 'chay_ket_qua'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200 text-slate-600'
-                }`}
+                  }`}
               >
                 {counts.chay_ket_qua}
               </span>
@@ -579,19 +577,17 @@ export default function CaseTable({
 
             <button
               onClick={() => setActiveStatusTab('da_tra_ket_qua')}
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                activeStatusTab === 'da_tra_ket_qua'
+              className={`px-4 py-2 rounded-full text-sm font-bold transition-all cursor-pointer flex items-center gap-2 ${activeStatusTab === 'da_tra_ket_qua'
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+                }`}
             >
               <span>Đã trả kết quả</span>
               <span
-                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${
-                  activeStatusTab === 'da_tra_ket_qua'
+                className={`px-2 py-0.5 rounded-full text-xs font-extrabold ${activeStatusTab === 'da_tra_ket_qua'
                     ? 'bg-white/20 text-white'
                     : 'bg-slate-200 text-slate-600'
-                }`}
+                  }`}
               >
                 {counts.da_tra_ket_qua}
               </span>
@@ -899,9 +895,9 @@ export default function CaseTable({
                                 e.stopPropagation();
                                 setOpenActionId(null);
                                 setSelectedCaseForAccept(item);
-                                setSelectedDoctorForAccept(item.bacSiDoc || doctorList[0]?.fullName || 'TS.BS Nguyễn Sỹ Lãnh');
-                                const defaultDoc2 = doctorList.length > 2 ? doctorList[2]?.fullName : (doctorList[1]?.fullName || 'TS . BS Nguyễn Khánh Dương');
-                                setSelectedDoctorForAccept2((item as any).bacSiDoc2 || defaultDoc2);
+                                setSelectedDoctorForAccept(item.bacSiDocUsername || (doctorList.find(d => d.fullName === item.bacSiDoc)?.username) || doctorList[0]?.username || 'bacsi_lanh');
+                                const defaultDoc2 = doctorList.length > 2 ? doctorList[2]?.username : (doctorList[1]?.username || 'bacsi_duong');
+                                setSelectedDoctorForAccept2((item as any).bacSiDoc2Username || (doctorList.find(d => d.fullName === (item as any).bacSiDoc2)?.username) || defaultDoc2);
                                 setShowAcceptModal(true);
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#00a86b] hover:bg-[#008f5a] text-white rounded-lg text-[11px] font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 leading-tight text-left"
@@ -927,7 +923,7 @@ export default function CaseTable({
                                 const right = Math.max(16, window.innerWidth - rect.right);
                                 const spaceBelow = window.innerHeight - rect.bottom;
                                 const ESTIMATED_MENU_HEIGHT = 160;
-                                
+
                                 let top: number;
                                 if (spaceBelow < ESTIMATED_MENU_HEIGHT && rect.top > ESTIMATED_MENU_HEIGHT) {
                                   top = rect.top - ESTIMATED_MENU_HEIGHT - 4;
@@ -1015,11 +1011,10 @@ export default function CaseTable({
                   <button
                     key={`page-${p}`}
                     onClick={() => setCurrentPage(p as number)}
-                    className={`min-w-9 h-9 px-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${
-                      isCurrent
+                    className={`min-w-9 h-9 px-2.5 rounded-lg text-sm font-bold transition-all cursor-pointer ${isCurrent
                         ? 'bg-[#0070f3] text-white shadow-xs'
                         : 'bg-white border border-slate-200/80 text-slate-700 hover:bg-slate-100'
-                    }`}
+                      }`}
                   >
                     {p}
                   </button>
@@ -1118,7 +1113,7 @@ export default function CaseTable({
                       className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer shadow-2xs"
                     >
                       {doctorList.map((doc) => (
-                        <option key={`accept-doc1-${doc.username || doc.fullName}`} value={doc.fullName}>
+                        <option key={`accept-doc1-${doc.username || doc.fullName}`} value={doc.username}>
                           {doc.fullName} ({doc.username})
                         </option>
                       ))}
@@ -1135,7 +1130,7 @@ export default function CaseTable({
                       className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer shadow-2xs"
                     >
                       {doctorList.map((doc) => (
-                        <option key={`accept-doc2-${doc.username || doc.fullName}`} value={doc.fullName}>
+                        <option key={`accept-doc2-${doc.username || doc.fullName}`} value={doc.username}>
                           {doc.fullName} ({doc.username})
                         </option>
                       ))}
@@ -1156,7 +1151,7 @@ export default function CaseTable({
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none cursor-pointer shadow-2xs"
                   >
                     {doctorList.map((doc) => (
-                      <option key={`accept-doc-${doc.username || doc.fullName}`} value={doc.fullName}>
+                      <option key={`accept-doc-${doc.username || doc.fullName}`} value={doc.username}>
                         {doc.fullName} ({doc.username})
                       </option>
                     ))}

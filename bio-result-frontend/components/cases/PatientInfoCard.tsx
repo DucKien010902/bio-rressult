@@ -223,15 +223,22 @@ export default function PatientInfoCard({
             </label>
             <select
               disabled={!isAdmin}
-              value={caseData?.bacSiDoc || (doctorList.length > 0 ? doctorList[0].fullName : 'TS.BS Nguyễn Sỹ Lãnh')}
-              onChange={(e) => onChange('bacSiDoc', e.target.value)}
+              value={caseData?.bacSiDocUsername || doctorList.find(d => d.fullName === caseData?.bacSiDoc)?.username || doctorList[0]?.username || 'bacsi_lanh'}
+              onChange={(e) => {
+                const u = e.target.value;
+                const found = doctorList.find(d => d.username === u);
+                if (found) {
+                  onChange('bacSiDoc', found.fullName);
+                  onChange('bacSiDocUsername', found.username);
+                }
+              }}
               className={`w-full px-3.5 py-2.5 rounded-xl border font-bold transition-all ${isAdmin
                 ? 'border-sky-300 bg-sky-50/50 text-slate-900 focus:bg-white focus:outline-none focus:border-[#0070f3] cursor-pointer'
                 : 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none'
                 }`}
             >
               {doctorList.map((doc) => (
-                <option key={`doc1-${doc.username || doc.fullName}`} value={doc.fullName}>
+                <option key={`doc1-${doc.username || doc.fullName}`} value={doc.username}>
                   {doc.fullName} ({doc.username})
                 </option>
               ))}
@@ -244,16 +251,26 @@ export default function PatientInfoCard({
             </label>
             <select
               disabled={!isAdmin}
-              value={caseData?.bacSiDoc2 || ''}
-              onChange={(e) => onChange('bacSiDoc2', e.target.value)}
+              value={caseData?.bacSiDoc2Username || doctorList.find(d => d.fullName === caseData?.bacSiDoc2)?.username || ''}
+              onChange={(e) => {
+                const u = e.target.value;
+                const found = doctorList.find(d => d.username === u);
+                if (found) {
+                  onChange('bacSiDoc2', found.fullName);
+                  onChange('bacSiDoc2Username', found.username);
+                } else {
+                  onChange('bacSiDoc2', '');
+                  onChange('bacSiDoc2Username', '');
+                }
+              }}
               className={`w-full px-3.5 py-2.5 rounded-xl border font-bold transition-all ${isAdmin
                 ? 'border-purple-300 bg-purple-50/50 text-slate-900 focus:bg-white focus:outline-none focus:border-purple-600 cursor-pointer'
                 : 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none'
                 }`}
             >
-              <option value="" disabled>-- Chưa phân công Bác sĩ 2 --</option>
+              <option value="">-- Chưa phân công Bác sĩ 2 --</option>
               {doctorList.map((doc) => (
-                <option key={`doc2-${doc.username || doc.fullName}`} value={doc.fullName}>
+                <option key={`doc2-${doc.username || doc.fullName}`} value={doc.username}>
                   {doc.fullName} ({doc.username})
                 </option>
               ))}
@@ -267,15 +284,22 @@ export default function PatientInfoCard({
           </label>
           <select
             disabled={!isAdmin}
-            value={caseData?.bacSiDoc || 'TS.BS Nguyễn Sỹ Lãnh'}
-            onChange={(e) => onChange('bacSiDoc', e.target.value)}
+            value={caseData?.bacSiDocUsername || doctorList.find(d => d.fullName === caseData?.bacSiDoc)?.username || doctorList[0]?.username || 'bacsi_lanh'}
+            onChange={(e) => {
+              const u = e.target.value;
+              const found = doctorList.find(d => d.username === u);
+              if (found) {
+                onChange('bacSiDoc', found.fullName);
+                onChange('bacSiDocUsername', found.username);
+              }
+            }}
             className={`w-full sm:w-1/2 px-3.5 py-2.5 rounded-xl border font-bold transition-all ${isAdmin
               ? 'border-sky-300 bg-sky-50/50 text-slate-900 focus:bg-white focus:outline-none focus:border-[#0070f3] cursor-pointer'
               : 'border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed select-none'
               }`}
           >
             {doctorList.map((doc) => (
-              <option key={doc.username || doc.fullName} value={doc.fullName}>
+              <option key={doc.username || doc.fullName} value={doc.username}>
                 {doc.fullName} ({doc.username})
               </option>
             ))}

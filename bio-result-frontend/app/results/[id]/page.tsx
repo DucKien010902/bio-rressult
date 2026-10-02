@@ -157,19 +157,26 @@ export default function CaseDetailPage() {
   const [isReleasing, setIsReleasing] = useState(false);
   const isCombo = caseData?.loaiXetNghiem?.startsWith('combo_');
 
+  const userUsername = (currentUser?.username || '').trim().toLowerCase();
   const docFullName = (currentUser?.fullName || '').trim().toLowerCase();
-  const docUsername = (currentUser?.username || '').trim().toLowerCase();
+
+  const caseDoc1User = (caseData?.bacSiDocUsername || '').trim().toLowerCase();
+  const caseDoc2User = (caseData?.bacSiDoc2Username || '').trim().toLowerCase();
 
   const doc1 = (caseData?.bacSiDoc || '').trim().toLowerCase();
   const doc2 = (caseData?.bacSiDoc2 || caseData?.bacSiDoc || '').trim().toLowerCase();
 
-  const isSameDoctor = Boolean(doc1 && doc2 && doc1 === doc2);
-
+  // So sánh định danh theo username duy nhất trước, fallback sang fullName nếu ca chưa có username
   const matchesDoc1 = Boolean(
-    (docFullName && doc1.includes(docFullName)) || (docUsername && doc1.includes(docUsername))
+    caseDoc1User ? userUsername === caseDoc1User : (docFullName && doc1 === docFullName)
   );
   const matchesDoc2 = Boolean(
-    (docFullName && doc2.includes(docFullName)) || (docUsername && doc2.includes(docUsername))
+    caseDoc2User ? userUsername === caseDoc2User : (docFullName && doc2 === docFullName)
+  );
+
+  const isSameDoctor = Boolean(
+    (caseDoc1User && caseDoc2User && caseDoc1User === caseDoc2User) ||
+    (!caseDoc1User && !caseDoc2User && doc1 && doc2 && doc1 === doc2)
   );
 
   // Quyền chỉnh sửa Phần 1 (HPV):
@@ -187,21 +194,31 @@ export default function CaseDetailPage() {
       return;
     }
 
-    // Kiểm tra quyền ký từng phần của Bác sĩ đối với ca Combo
-    if (isDoctor && isCombo && !isSameDoctor) {
-      if (part === 1 && !matchesDoc1) {
-        toast.warning(
-          `Bạn không được phân công đọc Phần 1 (HPV - do BS ${caseData?.bacSiDoc} phụ trách). Không có quyền ký duyệt!`,
-          'Từ chối quyền'
-        );
-        return;
-      }
-      if (part === 2 && !matchesDoc2) {
-        toast.warning(
-          `Bạn không được phân công đọc Phần 2 (Tế bào học - do BS ${caseData?.bacSiDoc2 || caseData?.bacSiDoc} phụ trách). Không có quyền ký duyệt!`,
-          'Từ chối quyền'
-        );
-        return;
+    // Kiểm tra quyền ký duyệt của Bác sĩ xét theo mã tài khoản duy nhất
+    if (isDoctor) {
+      if (isCombo) {
+        if (part === 1 && !matchesDoc1) {
+          toast.warning(
+            `Bạn không được phân công đọc Phần 1 (HPV - do BS ${caseData?.bacSiDoc} phụ trách). Không có quyền ký duyệt!`,
+            'Từ chối quyền'
+          );
+          return;
+        }
+        if (part === 2 && !matchesDoc2) {
+          toast.warning(
+            `Bạn không được phân công đọc Phần 2 (Tế bào học - do BS ${caseData?.bacSiDoc2 || caseData?.bacSiDoc} phụ trách). Không có quyền ký duyệt!`,
+            'Từ chối quyền'
+          );
+          return;
+        }
+      } else {
+        if (!matchesDoc1) {
+          toast.warning(
+            `Bạn không được phân công đọc ca này (do BS ${caseData?.bacSiDoc} phụ trách). Không có quyền ký duyệt!`,
+            'Từ chối quyền'
+          );
+          return;
+        }
       }
     }
 

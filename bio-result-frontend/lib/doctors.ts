@@ -12,7 +12,8 @@ export const DEFAULT_DOCTOR_LIST: DoctorOption[] = [
   { username: 'bacsi_hung', fullName: 'BS CK1 PHẠM THẾ HÙNG', donVi: 'Khoa Xét Nghiệm - GPB' },
   { username: 'bacsi_truc', fullName: 'BSCK1 . Nguyễn Trung Trực', donVi: 'Khoa Tế Bào Học' },
   { username: 'bacsi_duong', fullName: 'TS . BS Nguyễn Khánh Dương', donVi: 'Khoa Tế Bào Học' },
-  { username: 'bacsi_lanh', fullName: 'TS.BS Nguyễn Sỹ Lãnh', donVi: 'Khoa GPB & Tế Bào' },
+  { username: 'bacsi_lanh', fullName: 'TS.BS Nguyễn Sỹ Lánh', donVi: 'Khoa GPB & Tế Bào' },
+  { username: 'bacsi_lanh2', fullName: 'TS.BS NGUYỄN SỸ LÁNH', donVi: 'Khoa Xét Nghiệm & Tế Bào' },
   { username: 'bacsi_son', fullName: 'ThS.BSNT Trịnh Ngọc Sơn', donVi: 'Khoa Giải Phẫu Bệnh' },
 ];
 
@@ -25,14 +26,13 @@ export async function fetchDoctorsList(): Promise<DoctorOption[]> {
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        // Kiểm tra nếu cache chứa bác sĩ dư thừa cũ (Văn Trực, Thế Đương...) hoặc không đủ 5 bác sĩ chuẩn
         const hasOutdatedDoc = parsed.some(
           (d: any) =>
             d.username === 'bacsi_theduong' ||
             (d.fullName && (d.fullName.includes('Văn Trực') || d.fullName.includes('THẾ ĐƯƠNG')))
         );
-        if (Array.isArray(parsed) && parsed.length === 5 && !hasOutdatedDoc) {
-          // Trả về cache ngay và ngầm cập nhật
+        if (Array.isArray(parsed) && parsed.length >= 5 && !hasOutdatedDoc) {
+          // Trả về cache ngay và ngầm cập nhật phiên bản mới nhất
           updateDoctorsCache();
           return parsed;
         }

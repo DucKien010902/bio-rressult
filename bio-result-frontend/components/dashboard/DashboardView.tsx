@@ -74,8 +74,8 @@ export default function DashboardView({
       let url = getApiUrl('/cases/stats');
       const params = new URLSearchParams();
 
-      if (isDoctor && doctorName) {
-        params.append('doctor', doctorName);
+      if (isDoctor) {
+        params.append('doctor', currentUser?.username || doctorName);
       } else if (currentUser?.role === 'lab' && currentUser?.donVi) {
         params.append('donVi', currentUser.donVi);
       }
@@ -87,6 +87,7 @@ export default function DashboardView({
 
       const res = await fetch(url, {
         headers: getAuthHeaders(),
+        cache: 'no-store',
       });
       if (res.ok) {
         const data = await res.json();

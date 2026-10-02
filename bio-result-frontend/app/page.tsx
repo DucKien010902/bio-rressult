@@ -102,6 +102,7 @@ function DashboardContent() {
         {
           headers: getAuthHeaders(),
           signal,
+          cache: 'no-store',
         }
       );
       if (res.ok) {
