@@ -26,6 +26,7 @@ const userSchema = new mongoose.Schema(
     donVi: { type: String, default: '' },
     signatureUrl: { type: String, default: '' },
     allowedCategories: { type: [String], default: [] },
+    doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Doctor' },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true, strict: false },
@@ -90,7 +91,11 @@ const bioCaseSchema = new mongoose.Schema(
     ketLuan2: { type: String, default: '' },
     khuyenNghi: { type: String, default: '' },
     bacSiDoc: { type: String, default: '' },
+    bacSiDocUsername: { type: String, default: '', index: true },
+    bacSiDocId: { type: String, default: '' },
     bacSiDoc2: { type: String, default: '' },
+    bacSiDoc2Username: { type: String, default: '', index: true },
+    bacSiDoc2Id: { type: String, default: '' },
     daKy: { type: Boolean, default: false },
     daKy2: { type: Boolean, default: false },
 
@@ -128,7 +133,24 @@ const bioCaseSchema = new mongoose.Schema(
   { timestamps: true, collection: 'biocases', strict: false },
 );
 
+const doctorSchema = new mongoose.Schema(
+  {
+    code: { type: String, required: true, unique: true },
+    fullName: { type: String, required: true },
+    title: { type: String, default: '' },
+    donVi: { type: String, default: '' },
+    signatureUrl: { type: String, default: '' },
+    soDienThoai: { type: String, default: '' },
+    email: { type: String, default: '' },
+    chungChiHanhNghe: { type: String, default: '' },
+    allowedCategories: { type: [String], default: [] },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  },
+  { timestamps: true, collection: 'doctors', strict: false },
+);
+
 const UserModel = mongoose.model('User', userSchema, 'users');
+const DoctorModel = mongoose.model('Doctor', doctorSchema, 'doctors');
 const CaseModel = mongoose.model('BioCase', bioCaseSchema, 'biocases');
 
 const ALL_CATEGORIES = [
@@ -208,13 +230,13 @@ async function seed() {
   // ==========================================
   // 1. Cập nhật Tài khoản người dùng (Users)
   // ==========================================
-  // Xóa các tài khoản bác sĩ trùng lặp hoặc không thuộc danh sách 5 bác sĩ chuẩn
+  // Xóa các tài khoản bác sĩ trùng lặp hoặc không thuộc danh sách 6 bác sĩ chuẩn
   const redundantDoctors = ['bacsi_hùng', 'bacsy', 'bacsi_đương', 'bacsi_trực', 'bacsi_theduong'];
   const delUsersResult = await UserModel.deleteMany({
     $or: [
       { username: { $in: redundantDoctors } },
       { fullName: /THẾ ĐƯƠNG/i },
-      { role: 'doctor', username: { $nin: ['bacsi_lanh', 'bacsi_duong', 'bacsi_hung', 'bacsi_truc', 'bacsi_son'] } },
+      { role: 'doctor', username: { $nin: ['bacsi_lanh', 'bacsi_lanh2', 'bacsi_duong', 'bacsi_hung', 'bacsi_truc', 'bacsi_son'] } },
     ],
   });
   if (delUsersResult.deletedCount > 0) {
@@ -245,15 +267,26 @@ async function seed() {
       allowedCategories: ALL_CATEGORIES,
       isActive: true,
     },
-    // 5 Bác sĩ đọc & ký duyệt kết quả
+    // 6 Bác sĩ đọc & ký duyệt kết quả (Định danh bằng username/code duy nhất)
     {
       username: 'bacsi_lanh',
       password: pass123456,
       passwordHint: '123456',
-      fullName: 'TS.BS Nguyễn Sỹ Lãnh',
+      fullName: 'TS.BS Nguyễn Sỹ Lánh',
       role: 'doctor',
       title: 'Trưởng khoa Giải phẫu bệnh BV Việt Đức',
       donVi: 'Khoa GPB & Tế Bào',
+      allowedCategories: ALL_CATEGORIES,
+      isActive: true,
+    },
+    {
+      username: 'bacsi_lanh2',
+      password: pass123456,
+      passwordHint: '123456',
+      fullName: 'TS.BS NGUYỄN SỸ LÁNH',
+      role: 'doctor',
+      title: 'Trưởng khoa Giải phẫu bệnh BV Việt Đức',
+      donVi: 'Khoa Xét Nghiệm & Tế Bào',
       allowedCategories: ALL_CATEGORIES,
       isActive: true,
     },
@@ -353,6 +386,90 @@ async function seed() {
   console.log(`Đã cập nhật ${initialUsers.length} tài khoản người dùng!`);
 
   // ==========================================
+  // 1b. Cập nhật Bác sĩ Master (Doctor Collection)
+  // ==========================================
+  const initialDoctors = [
+    {
+      code: 'bacsi_lanh',
+      fullName: 'TS.BS Nguyễn Sỹ Lánh',
+      title: 'Trưởng khoa Giải phẫu bệnh BV Việt Đức',
+      donVi: 'Khoa GPB & Tế Bào',
+      signatureUrl: 'https://file.gennovax.vn/genhd/signatures/doctor_bacsi_lanh_1790558821165.png',
+      allowedCategories: ALL_CATEGORIES,
+    },
+    {
+      code: 'bacsi_lanh2',
+      fullName: 'TS.BS NGUYỄN SỸ LÁNH',
+      title: 'Trưởng khoa Giải phẫu bệnh BV Việt Đức',
+      donVi: 'Khoa Xét Nghiệm & Tế Bào',
+      signatureUrl: 'https://file.gennovax.vn/genhd/signatures/doctor_bacsi_lanh2_1790649780007.jpg',
+      allowedCategories: ALL_CATEGORIES,
+    },
+    {
+      code: 'bacsi_duong',
+      fullName: 'TS . BS Nguyễn Khánh Dương',
+      title: '(Chuyên khoa Xét nghiệm - Giải phẫu bệnh lý)',
+      donVi: 'Khoa Tế Bào Học',
+      signatureUrl: 'https://file.gennovax.vn/genhd/signatures/doctor_bacsi_duong_1790559222197.png',
+      allowedCategories: ALL_CATEGORIES,
+    },
+    {
+      code: 'bacsi_hung',
+      fullName: 'BS CK1 PHẠM THẾ HÙNG',
+      title: '(Chuyên khoa Xét nghiệm - Giải phẫu bệnh lý)',
+      donVi: 'Khoa Xét Nghiệm - GPB',
+      signatureUrl: 'https://file.gennovax.vn/genhd/signatures/doctor_bacsi_hung_1790559324405.png',
+      allowedCategories: ALL_CATEGORIES,
+    },
+    {
+      code: 'bacsi_truc',
+      fullName: 'BSCK1 . Nguyễn Trung Trực',
+      title: '(Bệnh viện K Trung Ương)',
+      donVi: 'Khoa Tế Bào Học',
+      signatureUrl: 'https://file.gennovax.vn/genhd/signatures/doctor_bacsi_truc_1790559441491.png',
+      allowedCategories: ALL_CATEGORIES,
+    },
+    {
+      code: 'bacsi_son',
+      fullName: 'ThS.BSNT Trịnh Ngọc Sơn',
+      title: '(Chuyên khoa Xét nghiệm - Giải phẫu bệnh lý)',
+      donVi: 'Khoa Giải Phẫu Bệnh',
+      signatureUrl: 'https://file.gennovax.vn/genhd/signatures/doctor_bacsi_son_1790523210101.png',
+      allowedCategories: ALL_CATEGORIES,
+    },
+  ];
+
+  const doctorsMap: Record<string, any> = {};
+  for (const docItem of initialDoctors) {
+    let doc = await DoctorModel.findOne({ code: docItem.code });
+    const user = await UserModel.findOne({ username: docItem.code });
+    if (doc) {
+      doc.fullName = docItem.fullName;
+      doc.title = docItem.title;
+      doc.donVi = docItem.donVi;
+      if (docItem.signatureUrl) doc.signatureUrl = docItem.signatureUrl;
+      doc.allowedCategories = docItem.allowedCategories;
+      if (user) {
+        doc.userId = user._id as any;
+        (user as any).doctorId = doc._id as any;
+        await user.save();
+      }
+      await doc.save();
+    } else {
+      doc = await DoctorModel.create({
+        ...docItem,
+        userId: user?._id,
+      });
+      if (user) {
+        (user as any).doctorId = doc._id as any;
+        await user.save();
+      }
+    }
+    doctorsMap[docItem.code] = doc;
+  }
+  console.log(`Đã cập nhật ${initialDoctors.length} bác sĩ trong danh mục bác sĩ (Doctor Master)!`);
+
+  // ==========================================
   // 2. Xóa sạch toàn bộ Ca xét nghiệm cũ & Xóa Index cũ nếu có
   // ==========================================
   try {
@@ -387,7 +504,28 @@ async function seed() {
       const namSinh = 1965 + ((i * 3) % 36); // 1965 đến 2001
       const diaChi = VIETNAMESE_ADDRESSES[i % VIETNAMESE_ADDRESSES.length];
       const donVi = LAB_FACILITIES[i % LAB_FACILITIES.length];
-      const bacSiDoc = DOCTOR_NAMES[i % DOCTOR_NAMES.length];
+
+      // Phân bổ Bác sĩ đọc kết quả theo chuyên môn và mã định danh duy nhất (Username / ID)
+      let doc1Obj = doctorsMap['bacsi_lanh2'] || { fullName: 'TS.BS NGUYỄN SỸ LÁNH', code: 'bacsi_lanh2', _id: '' };
+      let doc2Obj = doc1Obj;
+
+      if (cat === 'giaiphaubenh' || cat === 'giaiphaubenh_mobenh' || cat === 'giaiphaubenh_tebaohoc') {
+        doc1Obj = (i % 2 === 0) ? doctorsMap['bacsi_lanh'] : doctorsMap['bacsi_son'];
+        doc2Obj = doc1Obj;
+      } else if (cat.startsWith('combo_')) {
+        doc1Obj = doctorsMap['bacsi_hung']; // BS 1 đọc HPV
+        doc2Obj = doctorsMap['bacsi_lanh2']; // BS 2 đọc Tế bào / ThinPrep
+      } else if (cat === 'cell' || cat === 'thinprep' || cat === 'soituoi') {
+        const cellDocs = [doctorsMap['bacsi_lanh2'], doctorsMap['bacsi_duong'], doctorsMap['bacsi_truc']];
+        doc1Obj = cellDocs[i % cellDocs.length] || doc1Obj;
+        doc2Obj = doc1Obj;
+      } else {
+        // HPV đơn lẻ
+        const hpvDocs = [doctorsMap['bacsi_hung'], doctorsMap['bacsi_lanh2'], doctorsMap['bacsi_duong']];
+        doc1Obj = hpvDocs[i % hpvDocs.length] || doc1Obj;
+        doc2Obj = doc1Obj;
+      }
+
       const soDienThoai = `09${Math.floor(10000000 + Math.random() * 89999999)}`;
       const ngayNhan = '2026-09-15';
       const ngayTra = '2026-09-17';
@@ -427,8 +565,13 @@ async function seed() {
         ngayXetNghiem: ngayNhan,
         loaiMau: 'Dịch phết cổ tử cung',
         sampleType: 'Dịch phết cổ tử cung',
-        bacSiDoc,
-        doctorName: bacSiDoc,
+        bacSiDoc: doc1Obj.fullName,
+        bacSiDocUsername: doc1Obj.code,
+        bacSiDocId: String(doc1Obj._id || ''),
+        bacSiDoc2: doc2Obj.fullName,
+        bacSiDoc2Username: doc2Obj.code,
+        bacSiDoc2Id: String(doc2Obj._id || ''),
+        doctorName: doc1Obj.fullName,
         trangThai,
         status: trangThai,
         daKy,
@@ -648,8 +791,13 @@ async function seed() {
       else if (cat.startsWith('combo_')) {
         baseCase.anhTeBao = imgDataUri;
         baseCase.hienBieuDo = true;
-        baseCase.bacSiDoc2 = bacSiDoc;
-        baseCase.doctorName = bacSiDoc;
+        baseCase.bacSiDoc = doc1Obj.fullName;
+        baseCase.bacSiDocUsername = doc1Obj.code;
+        baseCase.bacSiDocId = String(doc1Obj._id || '');
+        baseCase.bacSiDoc2 = doc2Obj.fullName;
+        baseCase.bacSiDoc2Username = doc2Obj.code;
+        baseCase.bacSiDoc2Id = String(doc2Obj._id || '');
+        baseCase.doctorName = doc1Obj.fullName;
         baseCase.daKy2 = daKy;
         baseCase.ngayXetNghiem2 = ngayTra;
 

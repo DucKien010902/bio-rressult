@@ -147,9 +147,16 @@ export class CasesService {
       });
     }
 
-    // Lọc theo bác sĩ đọc kết quả (hỗ trợ cả bác sĩ 1 và 2, chuẩn hóa học hàm và khoảng trắng)
+    // Lọc theo bác sĩ đọc kết quả (xét theo tài khoản duy nhất username / code)
     if (doctor && doctor.trim() !== '') {
-      const rawName = doctor.trim();
+      const cleanDoctor = doctor.trim();
+      const docInfo = await this.usersService.getDoctorInfo(cleanDoctor);
+      const targetUsernames = new Set<string>();
+      targetUsernames.add(cleanDoctor.toLowerCase());
+      if (docInfo?.username) targetUsernames.add(docInfo.username.toLowerCase());
+      if (docInfo?.code) targetUsernames.add(docInfo.code.toLowerCase());
+
+      const rawName = docInfo?.fullName || cleanDoctor;
       const escapedRaw = rawName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
       const coreName = rawName.replace(/^(TS|BS|ThS|BSCK1|BS\s*CK1|BSNT|ThS\.\s*BSNT|\.|\s)+/gi, '').trim();
       const escapedCore = coreName.length >= 3 ? coreName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*') : escapedRaw;
@@ -157,9 +164,15 @@ export class CasesService {
 
       conditions.push({
         $or: [
-          { bacSiDoc: docRegex },
-          { bacSiDoc2: docRegex },
-          { doctorName: docRegex },
+          { bacSiDocUsername: { $in: Array.from(targetUsernames) } },
+          { bacSiDoc2Username: { $in: Array.from(targetUsernames) } },
+          // Fallback cho dữ liệu cũ nếu chưa được gắn bacSiDocUsername
+          {
+            $and: [
+              { $or: [{ bacSiDocUsername: { $in: [null, '', undefined] } }, { bacSiDocUsername: { $exists: false } }] },
+              { $or: [{ bacSiDoc: docRegex }, { bacSiDoc2: docRegex }, { doctorName: docRegex }] },
+            ],
+          },
         ],
       });
     }
@@ -281,10 +294,29 @@ export class CasesService {
       noiDung: 'Tạo mới phiếu xét nghiệm',
     };
 
+    const caseDataToSave: any = { ...data };
+    if (caseDataToSave.bacSiDoc) {
+      const docInfo = await this.usersService.getDoctorInfo(caseDataToSave.bacSiDoc);
+      if (docInfo) {
+        caseDataToSave.bacSiDoc = docInfo.fullName;
+        caseDataToSave.bacSiDocUsername = docInfo.username || docInfo.code || '';
+        caseDataToSave.bacSiDocId = docInfo._id || '';
+        caseDataToSave.doctorName = docInfo.fullName;
+      }
+    }
+    if (caseDataToSave.bacSiDoc2) {
+      const docInfo2 = await this.usersService.getDoctorInfo(caseDataToSave.bacSiDoc2);
+      if (docInfo2) {
+        caseDataToSave.bacSiDoc2 = docInfo2.fullName;
+        caseDataToSave.bacSiDoc2Username = docInfo2.username || docInfo2.code || '';
+        caseDataToSave.bacSiDoc2Id = docInfo2._id || '';
+      }
+    }
+
     const newCase = new this.caseModel({
-      ...data,
-      trangThai: data.trangThai || 'nhap_thong_tin',
-      status: data.status || 'pending',
+      ...caseDataToSave,
+      trangThai: caseDataToSave.trangThai || 'nhap_thong_tin',
+      status: caseDataToSave.status || 'pending',
       lichSuThaoTac: [initialLog],
       lichSuChinhSua: [initialLog],
     });
@@ -361,6 +393,34 @@ export class CasesService {
     delete (cleanData as any).updatedAt;
     delete (cleanData as any).lichSuThaoTac;
     delete (cleanData as any).lichSuChinhSua;
+
+    if (cleanData.bacSiDoc !== undefined) {
+      if (cleanData.bacSiDoc) {
+        const docInfo = await this.usersService.getDoctorInfo(cleanData.bacSiDoc);
+        if (docInfo) {
+          cleanData.bacSiDoc = docInfo.fullName;
+          cleanData.bacSiDocUsername = docInfo.username || docInfo.code || '';
+          cleanData.bacSiDocId = docInfo._id || '';
+          cleanData.doctorName = docInfo.fullName;
+        }
+      } else {
+        cleanData.bacSiDocUsername = '';
+        cleanData.bacSiDocId = '';
+      }
+    }
+    if (cleanData.bacSiDoc2 !== undefined) {
+      if (cleanData.bacSiDoc2) {
+        const docInfo2 = await this.usersService.getDoctorInfo(cleanData.bacSiDoc2);
+        if (docInfo2) {
+          cleanData.bacSiDoc2 = docInfo2.fullName;
+          cleanData.bacSiDoc2Username = docInfo2.username || docInfo2.code || '';
+          cleanData.bacSiDoc2Id = docInfo2._id || '';
+        }
+      } else {
+        cleanData.bacSiDoc2Username = '';
+        cleanData.bacSiDoc2Id = '';
+      }
+    }
 
     // So sánh các trường thay đổi để ghi lại lịch sử thao tác
     const changes = computeDiff(existing.toObject ? existing.toObject() : existing, cleanData);
@@ -502,13 +562,21 @@ export class CasesService {
       ngayDuKienTra: ngayDuKienTraDate.toISOString(),
     };
     if (bacSiDoc) {
-      updatePayload.bacSiDoc = bacSiDoc;
-      updatePayload.doctorName = bacSiDoc;
+      const docInfo = await this.usersService.getDoctorInfo(bacSiDoc);
+      updatePayload.bacSiDoc = docInfo?.fullName || bacSiDoc;
+      updatePayload.bacSiDocUsername = docInfo?.username || docInfo?.code || '';
+      updatePayload.bacSiDocId = docInfo?._id || '';
+      updatePayload.doctorName = updatePayload.bacSiDoc;
     }
     if (bacSiDoc2) {
-      updatePayload.bacSiDoc2 = bacSiDoc2;
+      const docInfo2 = await this.usersService.getDoctorInfo(bacSiDoc2);
+      updatePayload.bacSiDoc2 = docInfo2?.fullName || bacSiDoc2;
+      updatePayload.bacSiDoc2Username = docInfo2?.username || docInfo2?.code || '';
+      updatePayload.bacSiDoc2Id = docInfo2?._id || '';
     } else if (existing.loaiXetNghiem?.toLowerCase()?.startsWith('combo_') && !existing.bacSiDoc2 && bacSiDoc) {
-      updatePayload.bacSiDoc2 = bacSiDoc;
+      updatePayload.bacSiDoc2 = updatePayload.bacSiDoc;
+      updatePayload.bacSiDoc2Username = updatePayload.bacSiDocUsername;
+      updatePayload.bacSiDoc2Id = updatePayload.bacSiDocId;
     }
 
     const userName = user?.fullName || user?.username || 'Phòng Lab (Admin)';
@@ -953,12 +1021,32 @@ export class CasesService {
   ) {
     const andClauses: any[] = [];
 
-    // Lọc theo bác sĩ (nếu đang ở chế độ xem Bác sĩ)
+    // Lọc theo bác sĩ (nếu đang ở chế độ xem Bác sĩ - xét theo tài khoản duy nhất username / code)
     if (doctor && doctor.trim() !== '') {
+      const cleanDoctor = doctor.trim();
+      const docInfo = await this.usersService.getDoctorInfo(cleanDoctor);
+      const targetUsernames = new Set<string>();
+      targetUsernames.add(cleanDoctor.toLowerCase());
+      if (docInfo?.username) targetUsernames.add(docInfo.username.toLowerCase());
+      if (docInfo?.code) targetUsernames.add(docInfo.code.toLowerCase());
+
+      const rawName = docInfo?.fullName || cleanDoctor;
+      const escapedRaw = rawName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*');
+      const coreName = rawName.replace(/^(TS|BS|ThS|BSCK1|BS\s*CK1|BSNT|ThS\.\s*BSNT|\.|\s)+/gi, '').trim();
+      const escapedCore = coreName.length >= 3 ? coreName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*') : escapedRaw;
+      const docRegex = new RegExp(`(${escapedRaw}|${escapedCore})`, 'i');
+
       andClauses.push({
         $or: [
-          { bacSiDoc: new RegExp(doctor.trim(), 'i') },
-          { doctorName: new RegExp(doctor.trim(), 'i') },
+          { bacSiDocUsername: { $in: Array.from(targetUsernames) } },
+          { bacSiDoc2Username: { $in: Array.from(targetUsernames) } },
+          // Fallback cho dữ liệu cũ nếu chưa được gắn bacSiDocUsername
+          {
+            $and: [
+              { $or: [{ bacSiDocUsername: { $in: [null, '', undefined] } }, { bacSiDocUsername: { $exists: false } }] },
+              { $or: [{ bacSiDoc: docRegex }, { doctorName: docRegex }] },
+            ],
+          },
         ],
       });
     }
@@ -1189,11 +1277,25 @@ export class CasesService {
       });
     }
 
-    // Lọc theo bác sĩ
+    // Lọc theo bác sĩ (hỗ trợ cả username/code và regex fullName)
     if (doctor && doctor.trim() !== '') {
-      const regex = new RegExp(doctor.trim(), 'i');
+      const cleanDoctor = doctor.trim();
+      const docInfo = await this.usersService.getDoctorInfo(cleanDoctor);
+      const targetUsernames = new Set<string>();
+      targetUsernames.add(cleanDoctor.toLowerCase());
+      if (docInfo?.username) targetUsernames.add(docInfo.username.toLowerCase());
+      if (docInfo?.code) targetUsernames.add(docInfo.code.toLowerCase());
+
+      const rawName = docInfo?.fullName || cleanDoctor;
+      const regex = new RegExp(rawName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       conditions.push({
-        $or: [{ bacSiDoc: regex }, { bacSiDoc2: regex }, { doctorName: regex }],
+        $or: [
+          { bacSiDocUsername: { $in: Array.from(targetUsernames) } },
+          { bacSiDoc2Username: { $in: Array.from(targetUsernames) } },
+          { bacSiDoc: regex },
+          { bacSiDoc2: regex },
+          { doctorName: regex },
+        ],
       });
     }
 

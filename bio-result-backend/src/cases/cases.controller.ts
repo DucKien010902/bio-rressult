@@ -86,10 +86,8 @@ export class CasesController {
     // If logged in user is a DOCTOR, enforce data isolation: doctor only sees their own assigned cases!
     let effectiveDoctor = doctor;
     if (req.user?.role === 'doctor' || req.user?.role === 'bacsy') {
-      effectiveDoctor = req.user.fullName || req.user.username;
+      effectiveDoctor = req.user.username;
     }
-
-
 
     try {
       return await this.casesService.findAll(
@@ -121,7 +119,7 @@ export class CasesController {
       }
       let effectiveDoctor = doctor;
       if (req.user?.role === 'doctor' || req.user?.role === 'bacsy') {
-        effectiveDoctor = req.user.fullName || req.user.username;
+        effectiveDoctor = req.user.username;
       }
       return await this.casesService.getStats(
         effectiveDoctor,
@@ -152,7 +150,7 @@ export class CasesController {
     }
     let effectiveDoctor = doctor;
     if (req.user?.role === 'doctor' || req.user?.role === 'bacsy') {
-      effectiveDoctor = req.user.fullName || req.user.username;
+      effectiveDoctor = req.user.username;
     }
 
     const xlsxBuffer = await this.casesService.exportCasesExcel(

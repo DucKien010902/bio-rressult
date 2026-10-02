@@ -16,6 +16,13 @@ export const STANDARD_DOCTORS = [
     title: 'Trưởng khoa Giải phẫu bệnh BV Việt Đức',
   },
   {
+    code: 'bacsi_lanh2',
+    username: 'bacsi_lanh2',
+    fullName: 'TS.BS NGUYỄN SỸ LÁNH',
+    donVi: 'Khoa Xét Nghiệm & Tế Bào',
+    title: 'Trưởng khoa Giải phẫu bệnh BV Việt Đức',
+  },
+  {
     code: 'bacsi_duong',
     username: 'bacsi_duong',
     fullName: 'TS . BS Nguyễn Khánh Dương',
@@ -171,22 +178,35 @@ export class UsersService {
     return this.doctorModel.find().sort({ fullName: 1 }).lean().exec();
   }
 
-  async getDoctorInfo(doctorNameOrCode: string): Promise<{ fullName: string; title: string; signatureUrl: string | null } | null> {
+  async getDoctorInfo(doctorNameOrCode: string): Promise<{
+    _id?: string;
+    code?: string;
+    username?: string;
+    fullName: string;
+    title: string;
+    signatureUrl: string | null;
+  } | null> {
     if (!doctorNameOrCode) return null;
     const cleanName = doctorNameOrCode.trim();
     if (!cleanName || cleanName === 'Chưa phân loại') return null;
 
-    // 1. Tìm chính xác theo code hoặc fullName trong DoctorModel
-    let doctor = await this.doctorModel
-      .findOne({
-        $or: [
-          { code: cleanName },
-          { fullName: cleanName },
-          { fullName: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-        ],
-      })
-      .lean()
-      .exec();
+    // 1. Tìm chính xác theo code/username định danh duy nhất trước
+    let doctor = await this.doctorModel.findOne({ code: cleanName }).lean().exec();
+
+    // 2. Nếu không tìm thấy theo code, tìm chính xác theo fullName (phân biệt hoa thường)
+    if (!doctor) {
+      doctor = await this.doctorModel.findOne({ fullName: cleanName }).lean().exec();
+    }
+
+    // 3. Nếu vẫn không thấy, tìm case-insensitive theo fullName
+    if (!doctor) {
+      doctor = await this.doctorModel
+        .findOne({
+          fullName: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i'),
+        })
+        .lean()
+        .exec();
+    }
 
     // 2. Fuzzy match
     if (!doctor) {
@@ -214,6 +234,9 @@ export class UsersService {
       );
       if (matchStd) {
         return {
+          _id: undefined,
+          code: matchStd.code || matchStd.username || '',
+          username: matchStd.username || matchStd.code || '',
           fullName: matchStd.fullName,
           title: matchStd.title,
           signatureUrl: null,
@@ -223,6 +246,9 @@ export class UsersService {
     }
 
     return {
+      _id: doctor._id ? String(doctor._id) : undefined,
+      code: doctor.code || '',
+      username: doctor.code || '',
       fullName: doctor.fullName || cleanName,
       title: doctor.title || '',
       signatureUrl: doctor.signatureUrl || null,

@@ -245,10 +245,22 @@ export class BioCase extends Document {
   khuyenNghi!: string;
 
   @Prop({ default: '' })
-  bacSiDoc!: string; // Bác sĩ đọc kết quả 1
+  bacSiDoc!: string; // Tên hiển thị Bác sĩ đọc kết quả 1 (ví dụ: TS.BS Nguyễn Sỹ Lánh)
+
+  @Prop({ default: '', index: true })
+  bacSiDocUsername?: string; // Tên tài khoản bác sĩ 1 (duy nhất: bacsi_lanh, bacsi_lanh2...)
+
+  @Prop({ default: '', index: true })
+  bacSiDocId?: string; // ID bác sĩ 1
 
   @Prop({ default: '' })
-  bacSiDoc2!: string; // Bác sĩ đọc kết quả 2
+  bacSiDoc2!: string; // Tên hiển thị Bác sĩ đọc kết quả 2
+
+  @Prop({ default: '', index: true })
+  bacSiDoc2Username?: string; // Tên tài khoản bác sĩ 2 (duy nhất)
+
+  @Prop({ default: '', index: true })
+  bacSiDoc2Id?: string; // ID bác sĩ 2
 
   @Prop({ default: false })
   daKy!: boolean; // Bác sĩ 1 đã ký số / phê duyệt
