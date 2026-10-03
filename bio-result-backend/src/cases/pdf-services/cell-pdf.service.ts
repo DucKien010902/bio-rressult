@@ -508,9 +508,11 @@ export class CellPdfService extends BasePdfService {
 
         // Fallback file cục bộ
         if (!sigBuffer) {
+          const docCode = (drUsername || '').toLowerCase();
           const slug = drName.toLowerCase();
           let fallbackName = '';
-          if (slug.includes('lánh') || slug.includes('lanh')) fallbackName = 'bacsi_lanh.png';
+          if (docCode === 'bacsi_lanh2' || drName.includes('NGUYỄN SỸ LÁNH')) fallbackName = 'bacsi_lanh2.png';
+          else if (slug.includes('lánh') || slug.includes('lanh')) fallbackName = 'bacsi_lanh.png';
           else if (slug.includes('hùng') || slug.includes('hung')) fallbackName = 'bacsi_hung.png';
           else if (slug.includes('sơn') || slug.includes('son')) fallbackName = 'bacsi_son.png';
           else if (slug.includes('dương') || slug.includes('duong')) fallbackName = 'bacsi_duong.png';
@@ -855,9 +857,11 @@ export class CellPdfService extends BasePdfService {
 
       // Fallback kiểm tra file cục bộ nếu chưa có trên MinIO
       if (!sigBuffer) {
+        const docCode = (docUsername || '').toLowerCase();
         const slug = docName.toLowerCase();
         let fallbackName = '';
-        if (slug.includes('lánh') || slug.includes('lanh')) fallbackName = 'bacsi_lanh.png';
+        if (docCode === 'bacsi_lanh2' || docName.includes('NGUYỄN SỸ LÁNH')) fallbackName = 'bacsi_lanh2.png';
+        else if (slug.includes('lánh') || slug.includes('lanh')) fallbackName = 'bacsi_lanh.png';
         else if (slug.includes('hùng') || slug.includes('hung')) fallbackName = 'bacsi_hung.png';
         else if (slug.includes('sơn') || slug.includes('son')) fallbackName = 'bacsi_son.png';
         else if (slug.includes('dương') || slug.includes('duong')) fallbackName = 'bacsi_duong.png';
