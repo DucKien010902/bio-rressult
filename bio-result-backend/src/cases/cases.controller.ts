@@ -225,15 +225,23 @@ export class CasesController {
     }
 
     // Check permission for DOCTOR role: chỉ truy cập ca được phân công cho mình
-    if (
-      (req.user?.role === 'doctor' || req.user?.role === 'bacsy') &&
-      req.user.fullName
-    ) {
-      const docName = req.user.fullName.trim();
-      const isAssigned =
-        (caseItem.bacSiDoc && caseItem.bacSiDoc.includes(docName)) ||
-        (caseItem.doctorName && caseItem.doctorName.includes(docName)) ||
-        (caseItem.bacSiDoc2 && caseItem.bacSiDoc2.includes(docName));
+    if (req.user?.role === 'doctor' || req.user?.role === 'bacsy') {
+      const docUser = (req.user?.username || req.user?.code || '').trim().toLowerCase();
+      const docName = (req.user?.fullName || '').trim().toLowerCase();
+
+      const caseDoc1User = (caseItem.bacSiDocUsername || '').trim().toLowerCase();
+      const caseDoc2User = (caseItem.bacSiDoc2Username || '').trim().toLowerCase();
+      const caseDoc1Name = (caseItem.bacSiDoc || caseItem.doctorName || '').trim().toLowerCase();
+      const caseDoc2Name = (caseItem.bacSiDoc2 || '').trim().toLowerCase();
+
+      const isAssigned = Boolean(
+        (docUser && caseDoc1User && docUser === caseDoc1User) ||
+        (docUser && caseDoc2User && docUser === caseDoc2User) ||
+        (docName && caseDoc1Name && caseDoc1Name.includes(docName)) ||
+        (docName && caseDoc2Name && caseDoc2Name.includes(docName)) ||
+        (docUser && caseDoc1Name && caseDoc1Name.includes(docUser)) ||
+        (docUser && caseDoc2Name && caseDoc2Name.includes(docUser))
+      );
       if (!isAssigned) {
         throw new ForbiddenException(
           'Bác sĩ chỉ có quyền truy cập ca xét nghiệm được phân công cho mình!',
@@ -389,18 +397,25 @@ export class CasesController {
     // 2. Phân quyền cho tài khoản Bác sĩ (doctor / bacsy):
     // Được chỉnh sửa kết quả xét nghiệm chuyên môn, KHÔNG được sửa thông tin cá nhân của bệnh nhân
     if (role === 'doctor' || role === 'bacsy') {
-      const docName = (req.user?.fullName || '').trim();
-      const docUser = (req.user?.username || '').trim();
+      const docUser = (req.user?.username || req.user?.code || '').trim().toLowerCase();
+      const docName = (req.user?.fullName || '').trim().toLowerCase();
 
-      const isDoc1 =
-        (docName && existing.bacSiDoc && existing.bacSiDoc.includes(docName)) ||
-        (docUser && existing.bacSiDoc && existing.bacSiDoc.includes(docUser)) ||
-        (docName && existing.doctorName && existing.doctorName.includes(docName)) ||
-        (docUser && existing.doctorName && existing.doctorName.includes(docUser));
+      const caseDoc1User = (existing.bacSiDocUsername || '').trim().toLowerCase();
+      const caseDoc2User = (existing.bacSiDoc2Username || '').trim().toLowerCase();
+      const caseDoc1Name = (existing.bacSiDoc || existing.doctorName || '').trim().toLowerCase();
+      const caseDoc2Name = (existing.bacSiDoc2 || '').trim().toLowerCase();
 
-      const isDoc2 =
-        (docName && existing.bacSiDoc2 && existing.bacSiDoc2.includes(docName)) ||
-        (docUser && existing.bacSiDoc2 && existing.bacSiDoc2.includes(docUser));
+      const isDoc1 = Boolean(
+        (docUser && caseDoc1User && docUser === caseDoc1User) ||
+        (docName && caseDoc1Name && caseDoc1Name.includes(docName)) ||
+        (docUser && caseDoc1Name && caseDoc1Name.includes(docUser))
+      );
+
+      const isDoc2 = Boolean(
+        (docUser && caseDoc2User && docUser === caseDoc2User) ||
+        (docName && caseDoc2Name && caseDoc2Name.includes(docName)) ||
+        (docUser && caseDoc2Name && caseDoc2Name.includes(docUser))
+      );
 
       if (!isDoc1 && !isDoc2) {
         throw new ForbiddenException(

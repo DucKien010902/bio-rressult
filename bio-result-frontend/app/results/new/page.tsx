@@ -251,6 +251,9 @@ function NewCaseContent() {
       const b1 = formData.bacSiDoc === 'Chưa phân loại' ? '' : formData.bacSiDoc;
       const b2 = formData.bacSiDoc2 === 'Chưa phân loại' ? b1 : (formData.bacSiDoc2 || b1);
 
+      const doc1Obj = doctorList.find((d) => d.fullName === b1 || d.username === b1);
+      const doc2Obj = doctorList.find((d) => d.fullName === b2 || d.username === b2);
+
       const payload = {
         ...formData,
         donVi: effectiveDonVi,
@@ -267,8 +270,10 @@ function NewCaseContent() {
         status: 'nhap_thong_tin',
         daKy: false,
         daKy2: isCombo ? false : undefined,
-        bacSiDoc: b1,
-        bacSiDoc2: isCombo ? b2 : '',
+        bacSiDoc: doc1Obj?.fullName || b1,
+        bacSiDocUsername: doc1Obj?.username || '',
+        bacSiDoc2: isCombo ? (doc2Obj?.fullName || b2) : '',
+        bacSiDoc2Username: isCombo ? (doc2Obj?.username || '') : '',
       };
 
       const res = await fetch(getApiUrl('/cases'), {

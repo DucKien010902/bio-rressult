@@ -439,8 +439,10 @@ export default function CaseTable({
         if (sourceName !== selectedSource) return false;
       }
       if (selectedDoctor && selectedDoctor.trim() !== '') {
-        const docName = (item.bacSiDoc || '').toLowerCase();
-        if (!docName.includes(selectedDoctor.toLowerCase())) return false;
+        const doc1 = (item.bacSiDoc || '').toLowerCase();
+        const doc2 = ((item as any).bacSiDoc2 || '').toLowerCase();
+        const targetDoc = selectedDoctor.toLowerCase();
+        if (!doc1.includes(targetDoc) && !doc2.includes(targetDoc)) return false;
       }
       if (fromDate) {
         const created = item.createdAt ? item.createdAt.split('T')[0] : '';
@@ -712,6 +714,28 @@ export default function CaseTable({
                   // Tính toán thời gian trả / dự kiến & trạng thái quá hạn
                   const turnaround = getCaseTurnaroundInfo(item, turnaroundMap);
 
+                  // Kiểm tra ca Combo & Bác sĩ đang xem
+                  const isComboItem = Boolean(
+                    item.loaiXetNghiem?.toLowerCase()?.startsWith('combo_') ||
+                    (item.bacSiDoc2 && item.bacSiDoc2.trim() !== '' && item.bacSiDoc2 !== item.bacSiDoc)
+                  );
+
+                  const userUsername = currentUser?.username?.toLowerCase() || '';
+                  const userFullName = currentUser?.fullName?.toLowerCase() || '';
+
+                  // Đánh giá xem người dùng đang đăng nhập là BS 2 (ví dụ bacsi_lanh2)
+                  const isUserDoctor2 = Boolean(
+                    isComboItem &&
+                    ((item.bacSiDoc2Username && userUsername === item.bacSiDoc2Username.toLowerCase()) ||
+                     (item.bacSiDoc2 && (userFullName.includes(item.bacSiDoc2.toLowerCase()) || userUsername.includes('lanh2'))))
+                  );
+
+                  // Đánh giá xem người dùng đang đăng nhập là BS 1
+                  const isUserDoctor1 = Boolean(
+                    (item.bacSiDocUsername && userUsername === item.bacSiDocUsername.toLowerCase()) ||
+                    (item.bacSiDoc && userFullName.includes(item.bacSiDoc.toLowerCase()))
+                  );
+
                   // Màu dòng và viền cạnh trái theo trạng thái
                   let rowBgClass = 'bg-white hover:bg-sky-50/40';
                   let firstCellBorder = '';
@@ -783,30 +807,151 @@ export default function CaseTable({
                         </td>
                       )}
 
-                      {/* Bác sĩ đọc kết quả 1 (hoặc BS đơn) */}
-                      <td className="py-3 px-3.5">
-                        <div className="text-xs font-semibold text-slate-700 leading-tight">
-                          {item.bacSiDoc || 'Chưa phân công'}
-                        </div>
-                        {item.daKy && (
-                          <div className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                            <span>{isComboCategory ? 'BS 1 đã đọc' : 'Bác sĩ đã đọc'}</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Bác sĩ đọc kết quả 2 (nằm SAU BS 1 khi là ca Combo) */}
-                      {isComboCategory && (
-                        <td className="py-3 px-3.5">
-                          <div className="text-xs font-semibold text-purple-800 leading-tight">
-                            {item.bacSiDoc2 || 'Chưa phân công'}
-                          </div>
-                          {item.daKy2 && (
-                            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded-full text-[9.5px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                              <CheckCircle2 className="w-2.5 h-2.5 text-purple-600" />
-                              <span>BS 2 đã đọc</span>
+                      {/* Bác sĩ đọc kết quả 1 (hoặc hiển thị thông minh theo tài khoản / ca Combo) */}
+                      {isComboCategory ? (
+                        <>
+                          {/* Trong tab chuyên biệt Combo: Hiển thị 2 cột riêng */}
+                          <td className="py-3 px-3.5">
+                            <div className="text-xs font-semibold text-slate-700 leading-tight">
+                              {item.bacSiDoc || 'Chưa phân công'}
                             </div>
+                            {item.daKy ? (
+                              <div className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>BS 1 đã đọc</span>
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded-full text-[9.5px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                <Clock className="w-2.5 h-2.5 text-amber-500" />
+                                <span>BS 1 chưa đọc</span>
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3.5">
+                            <div className="text-xs font-semibold text-slate-700 leading-tight">
+                              {item.bacSiDoc2 || 'Chưa phân công'}
+                            </div>
+                            {item.daKy2 ? (
+                              <div className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>BS 2 đã đọc</span>
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded-full text-[9.5px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                <Clock className="w-2.5 h-2.5 text-amber-500" />
+                                <span>BS 2 chưa đọc</span>
+                              </div>
+                            )}
+                          </td>
+                        </>
+                      ) : (
+                        /* Trong các danh mục khác (Tất cả dịch vụ...): Ô đơn hiển thị thông minh */
+                        <td className="py-3 px-3.5">
+                          {!isComboItem ? (
+                            /* Ca đơn thường */
+                            <>
+                              <div className="text-xs font-semibold text-slate-700 leading-tight">
+                                {item.bacSiDoc || 'Chưa phân công'}
+                              </div>
+                              {item.daKy && (
+                                <div className="inline-flex items-center gap-1 px-1.5 py-0.5 mt-1 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span>Bác sĩ đã đọc</span>
+                                </div>
+                              )}
+                            </>
+                          ) : isAdmin ? (
+                            /* Ca Combo - Tài khoản Admin: Cùng màu chữ bác sĩ (slate-700) và cùng màu trạng thái (emerald cho đã đọc, amber cho chưa đọc) */
+                            <div className="space-y-1.5">
+                              <div className="flex items-center justify-between gap-1.5 text-xs">
+                                <div className="font-semibold text-slate-700 truncate max-w-[130px]" title={item.bacSiDoc || 'Chưa phân công'}>
+                                  {item.bacSiDoc || 'Chưa phân công'}
+                                </div>
+                                {item.daKy ? (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /> Đã đọc
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-medium bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                                    Chưa đọc
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between gap-1.5 text-xs pt-1 border-t border-slate-100">
+                                <div className="font-semibold text-slate-700 truncate max-w-[130px]" title={item.bacSiDoc2 || 'Chưa phân công'}>
+                                  {item.bacSiDoc2 || 'Chưa phân công'}
+                                </div>
+                                {item.daKy2 ? (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" /> Đã đọc
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-medium bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                                    Chưa đọc
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ) : isUserDoctor2 ? (
+                            /* Ca Combo - Bác sĩ đang đăng nhập là BS 2 (BS Lánh) */
+                            <>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-slate-800 leading-tight">
+                                  {item.bacSiDoc2 || 'Chưa phân công'}
+                                </span>
+                              </div>
+
+                              <div className="mt-1">
+                                {item.daKy2 ? (
+                                  <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                    <span>Bạn đã đọc</span>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                    <Clock className="w-2.5 h-2.5 text-amber-500" />
+                                    <span>Chưa đọc</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {item.bacSiDoc && (
+                                <div className="text-[10px] text-slate-400 font-medium mt-1 truncate max-w-[170px]" title={`Cùng đọc: ${item.bacSiDoc}`}>
+                                  Cùng đọc: <span className="text-slate-600">{item.bacSiDoc}</span> {item.daKy ? '✓' : ''}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            /* Ca Combo - Bác sĩ 1 hoặc xem mặc định */
+                            <>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-slate-800 leading-tight">
+                                  {item.bacSiDoc || 'Chưa phân công'}
+                                </span>
+                              </div>
+
+                              <div className="mt-1">
+                                {item.daKy ? (
+                                  <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                                    <span>{isUserDoctor1 ? 'Bạn đã đọc' : 'Đã đọc'}</span>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                    <Clock className="w-2.5 h-2.5 text-amber-500" />
+                                    <span>Chưa đọc</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {item.bacSiDoc2 && (
+                                <div className="text-[10px] text-slate-400 font-medium mt-1 truncate max-w-[170px]" title={`Cùng đọc: ${item.bacSiDoc2}`}>
+                                  Cùng đọc: <span className="text-slate-600 font-medium">{item.bacSiDoc2}</span> {item.daKy2 ? '✓' : ''}
+                                </div>
+                              )}
+                            </>
                           )}
                         </td>
                       )}
