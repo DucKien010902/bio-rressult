@@ -311,13 +311,14 @@ export class SoituoiPdfService extends BasePdfService {
     });
 
     // Bác sĩ đọc kết quả & Chữ ký số
+    const drLookupKey = (caseItem.bacSiDocUsername || caseItem.bacSiDoc || caseItem.nguoiThucHien || 'bacsi_hung').trim();
     const drName = (caseItem.bacSiDoc || caseItem.nguoiThucHien || 'BS CK1 PHẠM THẾ HÙNG').trim();
     let subTitle = (caseItem.chucDanhDoc || '').trim();
     let signatureUrl = (caseItem.signatureUrl || caseItem.chuKy || caseItem.signatureImage || '').trim();
 
     if (this.usersService) {
       try {
-        const docInfo = await this.usersService.getDoctorInfo(drName);
+        const docInfo = await this.usersService.getDoctorInfo(drLookupKey);
         if (docInfo) {
           if (!subTitle && docInfo.title) subTitle = docInfo.title;
           if (!signatureUrl && docInfo.signatureUrl) signatureUrl = docInfo.signatureUrl;

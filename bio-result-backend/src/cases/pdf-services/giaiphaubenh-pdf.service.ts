@@ -172,13 +172,14 @@ export class GiaiphaubenhPdfService extends BasePdfService {
     drawCentered(dStr, 345, 530, 132.8, { size: 8.5, color: rgb(0.25, 0.3, 0.35) });
 
     // Bác sĩ đọc kết quả & Chữ ký số
+    const drLookupKey = (caseItem.bacSiDocUsername || caseItem.bacSiDoc || caseItem.nguoiThucHien || 'bacsi_truc').trim();
     const drName = (caseItem.bacSiDoc || caseItem.nguoiThucHien || 'BSCK1 . Nguyễn Trung Trực').trim();
     let subTitle = (caseItem.chucDanhDoc || '').trim();
     let signatureUrl = (caseItem.signatureUrl || caseItem.chuKy || caseItem.signatureImage || '').trim();
 
     if (this.usersService) {
       try {
-        const docInfo = await this.usersService.getDoctorInfo(drName);
+        const docInfo = await this.usersService.getDoctorInfo(drLookupKey);
         if (docInfo) {
           if (!subTitle && docInfo.title) subTitle = docInfo.title;
           if (!signatureUrl && docInfo.signatureUrl) signatureUrl = docInfo.signatureUrl;

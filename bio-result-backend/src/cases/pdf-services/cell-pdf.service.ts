@@ -451,6 +451,11 @@ export class CellPdfService extends BasePdfService {
     });
 
     // 8.3 Bác sĩ đọc kết quả & Chữ ký số
+    const drUsername =
+      pageIndex === 1
+        ? caseItem.bacSiDoc2Username || caseItem.bacSiDocUsername
+        : caseItem.bacSiDocUsername;
+
     const drName =
       (pageIndex === 1
         ? caseItem.bacSiDoc2 || caseItem.bacSiDoc
@@ -467,19 +472,17 @@ export class CellPdfService extends BasePdfService {
         color: rgb(1, 1, 1),
       });
 
-      // Lấy thông tin chức danh & chữ ký của bác sĩ
+      // Lấy thông tin chức danh & chữ ký của bác sĩ theo username trước
       let subTitle = caseItem.chucDanhDoc;
       let signatureUrl = caseItem.signatureUrl || caseItem.chuKy;
 
       if (this.usersService) {
         try {
-          if (!subTitle) {
-            const docUser = await this.usersService.findByUsername(drName);
-            if (docUser?.title) subTitle = docUser.title;
-            if (docUser?.signatureUrl) signatureUrl = docUser.signatureUrl;
-          }
-          if (!signatureUrl) {
-            signatureUrl = await this.usersService.getDoctorSignature(drName);
+          const docLookupKey = drUsername || drName;
+          const docInfo = await this.usersService.getDoctorInfo(docLookupKey);
+          if (docInfo) {
+            if (!subTitle && docInfo.title) subTitle = docInfo.title;
+            if (!signatureUrl && docInfo.signatureUrl) signatureUrl = docInfo.signatureUrl;
           }
         } catch (e) {}
       }
@@ -807,7 +810,10 @@ export class CellPdfService extends BasePdfService {
     pg.drawText(fullDate, { x: dateX, y: 198.5, size: 11.5, font: fontDate, color: medilabNavy });
 
     if (caseItem.daKy) {
+      const docUsername = caseItem.bacSiDocUsername;
       const docName = caseItem.bacSiDoc || caseItem.doctorName || 'BS CK1 PHẠM THẾ HÙNG';
+      const docLookupKey = docUsername || docName;
+
       // Dịch tên bác sĩ căn giữa chính xác với trục của "Bác sĩ đọc kết quả" (X = 479)
       const docW = fontB.widthOfTextAtSize(docName, 9.5);
       const docX = 479 - docW / 2;
@@ -819,12 +825,10 @@ export class CellPdfService extends BasePdfService {
 
       if (this.usersService) {
         try {
-          if (!signatureUrl) {
-            signatureUrl = await this.usersService.getDoctorSignature(docName);
-          }
-          if (!subTitle) {
-            const docUser = await this.usersService.findByUsername(docName);
-            if (docUser?.title) subTitle = docUser.title;
+          const docInfo = await this.usersService.getDoctorInfo(docLookupKey);
+          if (docInfo) {
+            if (!subTitle && docInfo.title) subTitle = docInfo.title;
+            if (!signatureUrl && docInfo.signatureUrl) signatureUrl = docInfo.signatureUrl;
           }
         } catch (e) {}
       }
